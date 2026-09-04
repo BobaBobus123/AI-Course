@@ -1,0 +1,17 @@
+{
+  "Самолеты.jpg": {
+    "expected_objects": ["airplane"]
+  },
+  "Кот с наушниками.jpg": {
+    "expected_objects": ["cat"]
+  },
+  "Жираф.jpg": {
+    "expected_objects": ["giraffe"]
+  },
+  "Леопард.jpg": {
+    "expected_objects": ["giraffe", "bear"]
+  },
+  "Хаски.jpg": {
+    "expected_objects": ["dog"]
+  }
+}

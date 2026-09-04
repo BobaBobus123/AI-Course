@@ -1,0 +1,17 @@
+{
+  "image1.jpg": {
+    "expected_objects": ["person", "car"]
+  },
+  "image2.jpg": {
+    "expected_objects": ["dog", "cat"]
+  },
+  "image3.jpg": {
+    "expected_objects": ["chair", "table"]
+  },
+  "image4.jpg": {
+    "expected_objects": ["bottle", "cup"]
+  },
+  "image5.jpg": {
+    "expected_objects": ["laptop", "phone"]
+  }
+}
