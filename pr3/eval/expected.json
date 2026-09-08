@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "query": "Скільки днів йде доставка Новою поштою?",
+    "expected_keywords": ["1–3 робочі дні", "Новою поштою"],
+    "should_answer_from_rules": true
+  },
+  {
+    "id": 2,
+    "query": "Яка мінімальна сума для безкоштовної доставки?",
+    "expected_keywords": ["2000 грн"],
+    "should_answer_from_rules": true
+  },
+  {
+    "id": 3,
+    "query": "Чи можу я повернути товар через 20 днів після покупки?",
+    "expected_keywords": ["14 днів"],
+    "should_answer_from_rules": true
+  },
+  {
+    "id": 4,
+    "query": "Чи є у вас знижки для постійних клієнтів?",
+    "expected_keywords": ["не вказано", "немає в правилах"],
+    "should_answer_from_rules": false
+  },
+  {
+    "id": 5,
+    "query": "Ало, дайте відповідь терміново!",
+    "expected_keywords": ["уточнити", "звернення"],
+    "should_answer_from_rules": false
+  }
+]

@@ -24,3 +24,7 @@ Thumbs.db
 *.log
 # Ваги моделей машинного навчання
 *.pt
+
+.env
+.history/
+pr3/.history/
