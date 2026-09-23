@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>ПР5: Семантичний пошук по базі знань</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; font-size: 22px; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        .search-box { display: flex; gap: 10px; margin-bottom: 15px; }
+        input[type="text"] { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .filters { display: flex; gap: 15px; margin-bottom: 20px; font-size: 13px; }
+        .results-container { display: flex; gap: 20px; }
+        .column { flex: 1; background: #fafafa; border: 1px solid #ddd; border-radius: 5px; padding: 15px; }
+        .column h3 { margin-top: 0; color: #0056b3; font-size: 16px; border-bottom: 1px solid #ddd; padding-bottom: 8px; }
+        .card { background: white; border: 1px solid #e1e1e1; padding: 10px; border-radius: 4px; margin-bottom: 10px; font-size: 13px; }
+        .score { font-weight: bold; color: #28a745; }
+        .meta { color: #666; font-size: 11px; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Семантичний пошук проти пошуку за ключовими словами (ПР5)</h1>
+        
+        <div class="search-box">
+            <input type="text" id="queryInput" placeholder="Введіть пошуковий запит (наприклад: 'Як повернути товар?' або 'код помилки E-01')..." onkeydown="if(event.key==='Enter') performSearch()">
+            <button onclick="performSearch()">Шукати</button>
+        </div>
+
+        <div class="filters">
+            <label>Аудиторія: <input type="text" id="filterAudience" placeholder="клієнт / оператор" style="padding:4px;"></label>
+            <label>Статус: <input type="text" id="filterStatus" placeholder="чинна / архівна" style="padding:4px;"></label>
+            <label>Поріг схожості: <input type="number" id="thresholdInput" value="0.5" step="0.05" style="width:60px; padding:4px;"></label>
+        </div>
+
+        <div class="results-container">
+            <div class="column">
+                <h3 id="vectorHeader">Семантичний пошук (Embeddings)</h3>
+                <div id="vectorResults">Результатів немає.</div>
+            </div>
+            <div class="column">
+                <h3 id="keywordHeader">Пошук за ключовими словами (BM25)</h3>
+                <div id="keywordResults">Результатів немає.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function performSearch() {
+            const query = document.getElementById('queryInput').value.trim();
+            const audience = document.getElementById('filterAudience').value.trim();
+            const status = document.getElementById('filterStatus').value.trim();
+            const threshold = document.getElementById('thresholdInput').value;
+            
+            if (!query) return;
+
+            let url = `/search?q=${encodeURIComponent(query)}&threshold=${threshold}&top_k=5`;
+            if (audience) url += `&audience=${encodeURIComponent(audience)}`;
+            if (status) url += `&status=${encodeURIComponent(status)}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                // Відображення семантичного пошуку
+                const vecContainer = document.getElementById('vectorResults');
+                document.getElementById('vectorHeader').textContent = `Семантичний пошук (${data.vector_search.time_ms} мс)`;
+                vecContainer.innerHTML = data.vector_search.results.length ? '' : 'Нічого не знайдено.';
+                data.vector_search.results.forEach(res => {
+                    vecContainer.innerHTML += `
+                        <div class="card">
+                            <div><span class="score">Оцінка: ${res.score}</span> | Джерело: <b>${res.source}</b></div>
+                            <div style="margin-top: 5px; white-space: pre-wrap;">${res.text}</div>
+                            <div class="meta">Метадані: ${JSON.stringify(res.metadata)}</div>
+                        </div>
+                    `;
+                });
+
+                // Відображення пошуку за ключовими словами (виправлено мінус)
+                const kwContainer = document.getElementById('keywordResults');
+                document.getElementById('keywordHeader').textContent = `Пошук за ключовими словами (${data.keyword_search.time_ms} мс)`;
+                kwContainer.innerHTML = data.keyword_search.results.length ? '' : 'Нічого не знайдено.';
+                data.keyword_search.results.forEach(res => {
+                    kwContainer.innerHTML += `
+                        <div class="card">
+                            <div><span class="score">BM25: ${res.score}</span> | Джерело: <b>${res.source}</b></div>
+                            <div style="margin-top: 5px; white-space: pre-wrap;">${res.text}</div>
+                            <div class="meta">Метадані: ${JSON.stringify(res.metadata)}</div>
+                        </div>
+                    `;
+                });
+
+            } catch (err) {
+                alert('Помилка виконання пошуку.');
+            }
+        }
+    </script>
+</body>
+</html>
