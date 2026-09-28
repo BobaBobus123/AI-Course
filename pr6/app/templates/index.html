@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>ПР6: RAG-помічник служби підтримки</title>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --accent: #a855f7;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #cbd5e1;
+            --success-bg: #dcfce7;
+            --success-text: #166534;
+            --danger-bg: #fee2e2;
+            --danger-text: #991b1b;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 950px;
+            margin: auto;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2);
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-top: 0;
+            margin-bottom: 25px;
+            border-bottom: 2px solid #f1f5f9;
+            padding-bottom: 15px;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 16px 20px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s ease;
+            background: #f8fafc;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+        }
+
+        button {
+            padding: 16px 30px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 700;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 15px;
+            margin: 30px 0;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+
+        .result-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            padding: 30px;
+            border-radius: 16px;
+            margin-top: 25px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.03);
+            animation: slideUp 0.4s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .answer-box {
+            font-size: 17px;
+            line-height: 1.7;
+            color: var(--text-main);
+            margin-bottom: 25px;
+            white-space: pre-wrap;
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 5px solid var(--primary);
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            letter-spacing: 0.3px;
+        }
+        .badge-success { background: var(--success-bg); color: var(--success-text); }
+        .badge-danger { background: var(--danger-bg); color: var(--danger-text); }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--primary);
+            margin: 25px 0 12px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .source-item {
+            background: #f1f5f9;
+            border-left: 4px solid var(--accent);
+            padding: 12px 16px;
+            border-radius: 0 10px 10px 0;
+            margin-bottom: 10px;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        .source-item:hover { background: #e2e8f0; }
+
+        /* Стильный тег details */
+        details {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 14px 20px;
+            margin-top: 20px;
+            transition: background 0.2s;
+        }
+        details[open] { background: #f1f5f9; }
+        summary {
+            font-weight: 600;
+            cursor: pointer;
+            color: #475569;
+            font-size: 14px;
+            outline: none;
+            user-select: none;
+        }
+        summary:hover { color: var(--primary); }
+
+        .chunk-item {
+            background: white;
+            border: 1px solid #cbd5e1;
+            padding: 16px;
+            border-radius: 10px;
+            margin-top: 12px;
+            font-size: 13px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+        }
+
+        .meta-info {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 30px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 15px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 10px;
+        }
+        .meta-info span span { color: var(--text-main); font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>RAG-помічник служби підтримки «Сузір'я»</h1>
+        
+        <div class="search-box">
+            <input type="text" id="queryInput" placeholder="Введіть запитання клієнта (наприклад: 'Як повернути товар?')..." onkeydown="if(event.key==='Enter') askAssistant()">
+            <button onclick="askAssistant()">Запитати</button>
+        </div>
+
+        <div class="loading" id="loadingIndicator">✨ Штучний інтелект аналізує базу знань та формує відповідь...</div>
+
+        <div class="result-card" id="resultCard" style="display: none;">
+            <div id="statusBadge"></div>
+            <div class="answer-box" id="answerText"></div>
+
+            <div class="section-title">📌 Використані джерела:</div>
+            <div id="sourcesList"></div>
+
+            <details>
+                <summary>🔍 Показати сирі фрагменти бази знань (контекст моделі)</summary>
+                <div id="chunksList" style="margin-top: 10px;"></div>
+            </details>
+
+            <div class="meta-info" id="metaInfo"></div>
+        </div>
+    </div>
+
+    <script>
+        async function askAssistant() {
+            const query = document.getElementById('queryInput').value.trim();
+            const loading = document.getElementById('loadingIndicator');
+            const card = document.getElementById('resultCard');
+            
+            if (!query) return;
+
+            loading.style.display = 'block';
+            card.style.display = 'none';
+
+            try {
+                const response = await fetch(`/ask?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                
+                loading.style.display = 'none';
+                card.style.display = 'block';
+
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                const res = data.result;
+
+                // Бейдж
+                const badge = document.getElementById('statusBadge');
+                if (res.found_in_base) {
+                    badge.className = 'badge badge-success';
+                    badge.textContent = '✓ Знайдено за базою знань';
+                } else {
+                    badge.className = 'badge badge-danger';
+                    badge.textContent = '✕ У базі знань немає інформації';
+                }
+
+                // Текст
+                document.getElementById('answerText').textContent = res.response_text;
+
+                // Источники
+                const sourcesList = document.getElementById('sourcesList');
+                sourcesList.innerHTML = res.sources.length ? '' : '<span style="color:var(--text-muted); font-size:14px;">Модель не спиралася на джерела.</span>';
+                res.sources.forEach(src => {
+                    sourcesList.innerHTML += `
+                        <div class="source-item">
+                            <b>[${src.source_id}] ${src.document_name}</b> — Розділ: <i>${src.section}</i> (Редакція: ${src.updated})
+                        </div>
+                    `;
+                });
+
+                // Чанки
+                const chunksList = document.getElementById('chunksList');
+                chunksList.innerHTML = res.raw_chunks.length ? '' : 'Фрагменти відсутні.';
+                res.raw_chunks.forEach(chunk => {
+                    chunksList.innerHTML += `
+                        <div class="chunk-item">
+                            <b>[${chunk.source_id}] ${chunk.document_name}</b> &mdash; <i>${chunk.section}</i><br>
+                            <div style="color: #475569; margin-top: 6px; white-space: pre-wrap; line-height: 1.5;">${chunk.text}</div>
+                        </div>
+                    `;
+                });
+
+                // Метаинформация с иконками
+                document.getElementById('metaInfo').innerHTML = `
+                    <span>🤖 Модель: <span>${res.model}</span></span>
+                    <span>⚡ Пошук: <span>${data.search_time_ms} мс</span></span>
+                    <span>⏱️ Генерація: <span>${res.generation_time_seconds} с</span></span>
+                    <span>🔢 Токени: <span>${res.tokens.total_tokens}</span></span>
+                `;
+
+            } catch (err) {
+                loading.style.display = 'none';
+                alert('Помилка звернення до сервера.');
+            }
+        }
+    </script>
+</body>
+</html>
