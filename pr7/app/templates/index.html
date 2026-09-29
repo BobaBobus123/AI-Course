@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Обробка Рахунків | ПР7</title>
+    <style>
+        :root {
+            --bg-color: #f1f5f9;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --primary: #4f46e5;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --border: #e2e8f0;
+        }
+
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; padding: 40px 20px; }
+        .container { max-width: 1200px; margin: auto; display: grid; grid-template-columns: 1fr 2fr; gap: 30px; }
+        
+        h1 { grid-column: 1 / -1; margin-top: 0; font-size: 28px; color: var(--text-main); text-align: center; margin-bottom: 20px;}
+        
+        .card { background: var(--card-bg); border-radius: 16px; padding: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05); border: 1px solid var(--border); }
+        .card h2 { font-size: 18px; margin-top: 0; border-bottom: 2px solid var(--bg-color); padding-bottom: 12px; }
+
+        .upload-area { border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: 0.3s; background: #fafafa; }
+        .upload-area:hover { border-color: var(--primary); background: #f5f3ff; }
+        .upload-area { display: block; width: 100%; box-sizing: border-box; border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: 0.3s; background: #fafafa; }
+        
+        .btn { display: block; width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 15px; transition: 0.2s; }
+        .btn:hover { background: #4338ca; }
+        .btn:disabled { background: var(--text-muted); cursor: not-allowed; }
+
+        #imagePreview { max-width: 100%; max-height: 500px; border-radius: 8px; margin-top: 15px; display: none; object-fit: contain; }
+
+        /* Статуси рішень */
+        .decision-badge { padding: 12px 20px; border-radius: 8px; font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; display: none;}
+        .decision-auto { background: #d1fae5; color: #047857; border: 1px solid #34d399; }
+        .decision-review { background: #fef3c7; color: #b45309; border: 1px solid #fbbf24; }
+        .decision-reject { background: #fee2e2; color: #b91c1c; border: 1px solid #f87171; }
+
+        .issues-list { background: #fff1f2; border-left: 4px solid var(--danger); padding: 15px; border-radius: 0 8px 8px 0; margin-bottom: 20px; font-size: 14px; display: none;}
+        .issues-list ul { margin: 5px 0 0 0; padding-left: 20px; color: #991b1b; }
+
+        .data-view pre { background: #1e293b; color: #f8fafc; padding: 15px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+
+        .meta-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px; color: var(--text-muted); margin-top: 20px; border-top: 1px solid var(--border); padding-top: 15px; }
+        .meta-grid div span { font-weight: 600; color: var(--text-main); }
+
+        .loading-overlay { display: none; text-align: center; padding: 40px; color: var(--primary); font-weight: 600; }
+
+        @media (max-width: 768px) { .container { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Аналіз рахунків зі Штучним Інтелектом (ПР7)</h1>
+
+        <!-- Ліва панель: Завантаження та прев'ю -->
+        <div class="card">
+            <h2>1. Завантаження документа</h2>
+            <label class="upload-area" id="dropZone">
+                <div style="font-size: 32px; margin-bottom: 10px;">📄</div>
+                <div>Натисніть або перетягніть файл рахунку сюди</div>
+                <input type="file" id="fileInput" accept="image/*" onchange="previewFile()">
+            </label>
+            <img id="imagePreview" alt="Прев'ю документа">
+            
+            <button class="btn" id="processBtn" onclick="processDocument()" disabled>Обробити документ</button>
+        </div>
+
+        <!-- Права панель: Результати -->
+        <div class="card" id="resultsPanel">
+            <h2>2. Результат аналізу</h2>
+            
+            <div id="loading" class="loading-overlay">
+                ⚙️ Модель аналізує зображення та застосовує правила...
+            </div>
+
+            <div id="resultContent" style="display: none;">
+                <div id="decisionBadge" class="decision-badge"></div>
+                
+                <div id="issuesBox" class="issues-list">
+                    <strong>Виявлені проблеми:</strong>
+                    <ul id="issuesList"></ul>
+                </div>
+
+                <div class="data-view">
+                    <strong>Вилучені структуровані дані:</strong>
+                    <pre id="jsonData"></pre>
+                </div>
+
+                <div class="meta-grid" id="metaGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function previewFile() {
+            const file = document.getElementById('fileInput').files[0];
+            const preview = document.getElementById('imagePreview');
+            const btn = document.getElementById('processBtn');
+            
+            if (file) {
+                preview.src = URL.createObjectURL(file);
+                preview.style.display = 'block';
+                btn.disabled = false;
+            }
+        }
+
+        async function processDocument() {
+            const file = document.getElementById('fileInput').files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            // UI Reset
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('resultContent').style.display = 'none';
+            document.getElementById('processBtn').disabled = true;
+
+            try {
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    body: formData
+                });
+                const res = await response.json();
+
+                // UI Update
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('resultContent').style.display = 'block';
+                document.getElementById('processBtn').disabled = false;
+
+                // Decision Badge
+                const badge = document.getElementById('decisionBadge');
+                badge.style.display = 'block';
+                badge.className = `decision-badge decision-${res.decision}`;
+                badge.textContent = `Рішення системи: ${res.decision}`;
+
+                // Issues
+                const issuesBox = document.getElementById('issuesBox');
+                const issuesList = document.getElementById('issuesList');
+                issuesList.innerHTML = '';
+                
+                if (res.reasons && res.reasons.length > 0) {
+                    issuesBox.style.display = 'block';
+                    res.reasons.forEach(r => {
+                        const li = document.createElement('li');
+                        li.textContent = r;
+                        issuesList.appendChild(li);
+                    });
+                } else {
+                    issuesBox.style.display = 'none';
+                }
+
+                // JSON Data
+                document.getElementById('jsonData').textContent = JSON.stringify(res.data, null, 2);
+
+                // Meta Info
+                const m = res.meta;
+                if(m.tokens) {
+                    document.getElementById('metaGrid').innerHTML = `
+                        <div>Розмір до: <span>${m.image_size_orig.join('x')} px</span></div>
+                        <div>Розмір після: <span>${m.image_size_new.join('x')} px</span></div>
+                        <div>Час моделі: <span>${m.time_llm} сек</span></div>
+                        <div>Час правил: <span>${m.time_rules} сек</span></div>
+                        <div>Всього токенів: <span>${m.tokens.total_tokens}</span></div>
+                        <div>Загальний час: <span>${m.time_total} сек</span></div>
+                    `;
+                }
+
+            } catch (err) {
+                alert("Помилка зв'язку з сервером.");
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('processBtn').disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
