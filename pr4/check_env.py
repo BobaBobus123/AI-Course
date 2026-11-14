@@ -9,7 +9,7 @@ load_dotenv(dotenv_path=env_path)
 
 API_KEY = os.getenv("LLM_API_KEY")
 BASE_URL = os.getenv("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
-MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gemini-3.6-flash")
+MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gemini-2.5-flash")
 
 print(f"[*] Перевірка конфігурації для ПР4...")
 print(f" - Шлях до .env: {env_path} (існує: {env_path.exists()})")
