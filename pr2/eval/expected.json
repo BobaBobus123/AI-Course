@@ -1,17 +1,41 @@
 {
   "Самолеты.jpg": {
-    "expected_objects": ["airplane"]
+    "expected_objects": ["airplane"],
+    "expected_min_count": 1,
+    "notes": "На зображенні кілька літаків: при порозі 0.25 знаходяться майже всі, при порозі > 0.70 дальні літаки пропускаються (False Negatives)."
   },
   "Кот с наушниками.jpg": {
-    "expected_objects": ["cat"]
+    "expected_objects": ["cat"],
+    "expected_min_count": 1,
+    "notes": "Кіт розпізнається з високим confidence (> 0.80). Навушники можуть давати хибні спрацювання або дублі за низького порога (< 0.25)."
   },
   "Жираф.jpg": {
-    "expected_objects": ["giraffe"]
+    "expected_objects": ["giraffe"],
+    "expected_min_count": 1,
+    "notes": "Чіткий приклад із датасету COCO: стабільно розпізнається як giraffe з високою впевненістю (> 0.85)."
   },
   "Леопард.jpg": {
-    "expected_objects": ["giraffe", "bear"]
+    "expected_objects": ["giraffe", "bear", "cat"],
+    "ground_truth_real": "leopard (клас відсутній у COCO)",
+    "expected_min_count": 1,
+    "notes": "Типовий приклад помилки 'неправильний клас' (Misclassification) та 'дубль': у 80 класах COCO немає леопарда, тому модель плямисту текстуру класифікує як giraffe, а силует — як bear або cat."
   },
   "Хаски.jpg": {
-    "expected_objects": ["dog"]
+    "expected_objects": ["dog"],
+    "expected_min_count": 1,
+    "notes": "Собака породи хаскі розпізнається як клас dog із високим confidence (> 0.80)."
+  },
+  "_evaluation_summary": {
+    "threshold_impact": {
+      "0.25": "Мінімум пропусків (знаходяться всі літаки на Самолеты.jpg), але на Леопард.jpg з'являються дублі рамок з різними класами (giraffe + bear).",
+      "0.50": "Збалансований поріг: стабільно знаходяться cat, giraffe, dog, airplane без зайвого шуму.",
+      "0.75": "Відсікаються невпевнені хибні класи, проте зростає кількість пропусків (менші літаки на фоні відсіюються)."
+    },
+    "error_types_observed": {
+      "missed_object": "Пропуск об'єкта (False Negative) — менші або частково перекриті літаки на 'Самолеты.jpg' при підвищенні порога до 0.75.",
+      "false_positive": "Хибне спрацювання (False Positive) — елементи аксесуарів на 'Кот с наушниками.jpg' при низькому порозі 0.15.",
+      "wrong_class": "Неправильний клас — на 'Леопард.jpg' модель передбачає 'giraffe' (через плями) або 'bear' (через форму тіла), бо класу леопарда немає у COCO.",
+      "duplicate": "Дубль — одночасне накладання рамок 'giraffe' та 'bear' на одного і того ж леопарда при низькому порозі confidence."
+    }
   }
 }
