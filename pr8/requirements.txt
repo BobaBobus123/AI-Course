@@ -11,6 +11,9 @@ python-dotenv>=1.0
 fastapi>=0.115
 uvicorn[standard]>=0.30
 
+# Signed cookie sessions used to keep the selected demo customer in session.
+itsdangerous>=2.2
+
 # Перевірка аргументів за JSON Schema, тією самою, що описує параметри
 # інструмента для моделі. Якщо параметри описуєте pydantic-моделями
 # (приходять разом із FastAPI), цей рядок можна прибрати

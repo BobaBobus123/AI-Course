@@ -26,17 +26,24 @@ import time
 from pathlib import Path
 
 MIN_PYTHON = (3, 10)
-PACKAGES = ("openai", "dotenv", "fastapi", "uvicorn", "pydantic")
-OPTIONAL_PACKAGES = ("jsonschema",)
-SETTINGS = ("LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL")
-OPTIONAL_SETTINGS = ("LLM_MAX_TOKENS", "LLM_TIMEOUT", "TOOL_MAX_ROUNDS", "SHOP_TODAY")
+PACKAGES = (
+    "openai", "dotenv", "fastapi", "uvicorn", "pydantic", "jsonschema",
+    "itsdangerous",
+)
+OPTIONAL_PACKAGES = ()
+SETTINGS = ("LLM_BASE_URL", "LLM_API_KEY")
+OPTIONAL_SETTINGS = (
+    "LLM_MAX_TOKENS", "LLM_TIMEOUT_SECONDS", "TOOL_MAX_ROUNDS",
+    "SHOP_TODAY", "SHOP_DELAY_MS", "SHOP_FAILURE_RATE", "SHOP_TIMEOUT_SECONDS",
+    "MOCK_LLM",
+)
 HERE = Path(__file__).parent
 
 HINTS = {
     "LLM_BASE_URL": "не задано: скопіюйте .env.example у .env",
     "LLM_API_KEY": "не задано: перенесіть ключ із .env попередніх робіт або візьміть "
                    "у Google AI Studio (aistudio.google.com)",
-    "LLM_MODEL": "не задано: назву моделі дивіться в Google AI Studio",
+    "LLM_MODEL_NAME": "не задано: назву моделі дивіться в Google AI Studio",
 }
 
 # Пробний інструмент. Питання про курс валюти на вигадану дату: відповісти
@@ -121,6 +128,12 @@ def check_settings() -> bool:
             report(True, f"налаштування {name}", f"задано, довжина {len(value)}")
         else:
             report(True, f"налаштування {name}", value)
+    model = os.getenv("LLM_MODEL_NAME") or os.getenv("LLM_MODEL")
+    if model:
+        report(True, "налаштування LLM_MODEL_NAME", model)
+    else:
+        report(False, "налаштування LLM_MODEL_NAME", HINTS["LLM_MODEL_NAME"])
+        ok = False
     for name in OPTIONAL_SETTINGS:
         value = os.getenv(name)
         if value:
@@ -158,7 +171,7 @@ def check_call() -> bool:
 
     base_url = os.getenv("LLM_BASE_URL")
     api_key = os.getenv("LLM_API_KEY")
-    model = os.getenv("LLM_MODEL")
+    model = os.getenv("LLM_MODEL_NAME") or os.getenv("LLM_MODEL")
     if not (base_url and api_key and model):
         report(False, "пробний запит", "перевірку пропущено: налаштування неповні")
         return False

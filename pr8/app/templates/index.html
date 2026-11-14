@@ -47,9 +47,16 @@
 
 <form id="form">
   <div class="row">
-    <!-- Вибір клієнта заміняє вхід у кабінет. У справжньому застосунку
-         клієнта визначає сесія, а не поле на сторінці. -->
-    <label>клієнт
+    <label>режим
+      <select id="mode">
+        <option value="ollama">Локальная модель Ollama (без API)</option>
+        <option value="api">Gemini API (использует квоту)</option>
+        <option value="mock">Тестовый mock (без AI)</option>
+      </select>
+    </label>
+    <!-- Демонстраційний вибір клієнта; справжній застосунок має визначати
+         особу через автентифікацію, а не дозволяти самостійний вибір. -->
+    <label>клієнт (демо-сесія)
       <select id="customer"></select>
     </label>
     <button type="button" class="secondary" id="reset" title="Повернути дані магазину до початкового стану">скинути дані магазину</button>
@@ -77,6 +84,7 @@
   const form = document.getElementById('form');
   const send = document.getElementById('send');
   const customerSelect = document.getElementById('customer');
+  const modeSelect = document.getElementById('mode');
   const answerBox = document.getElementById('answer');
   const callsBox = document.getElementById('calls');
   const toolsBox = document.getElementById('tools');
@@ -101,15 +109,49 @@
 
   async function loadCustomers() {
     try {
-      const list = await (await fetch('/api/customers')).json();
+      const configResponse = await fetch('/api/config');
+      if (!configResponse.ok) throw new Error('Не вдалося завантажити налаштування.');
+      const config = await configResponse.json();
+      modeSelect.value = ['api', 'ollama', 'mock'].includes(config.default_mode)
+        ? config.default_mode
+        : 'mock';
+      modeSelect.title = modeSelect.value === 'api'
+        ? (config.api_key_configured
+          ? 'Gemini API использует ключ и квоту провайдера.'
+          : 'Ключ API не настроен: Gemini API вернёт ошибку конфигурации.')
+        : modeSelect.value === 'ollama'
+          ? `Локальна Ollama: ${config.ollama_model}. Потрібна запущена Ollama.`
+          : 'Тестовый mock не использует модель и отвечает только по заданным сценариям.';
+      const response = await fetch('/api/customers');
+      if (!response.ok) throw new Error('Не вдалося завантажити клієнтів.');
+      const list = await response.json();
       for (const c of list) {
         const option = el('option', '', `${c.name} · ${c.city} (${c.customer_id})`);
         option.value = c.customer_id;
         customerSelect.appendChild(option);
       }
-    } catch {
+      const sessionResponse = await fetch('/api/session');
+      if (!sessionResponse.ok) throw new Error('Не вдалося відновити сесію.');
+      const session = await sessionResponse.json();
+      customerSelect.value = session.customer_id || (list[0] && list[0].customer_id) || '';
+      if (customerSelect.value && !session.customer_id) {
+        await setCustomerSession(customerSelect.value);
+      }
+    } catch (error) {
       customerSelect.appendChild(el('option', '', 'не вдалося завантажити'));
+      showError(error.message || 'Не вдалося завантажити список клієнтів.');
     }
+  }
+
+  async function setCustomerSession(customerId) {
+    const response = await fetch('/api/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customer_id: customerId }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Не вдалося змінити сесію.');
+    return data;
   }
 
   // Описи інструментів — рівно те, що отримує модель. Якщо модель
@@ -157,6 +199,7 @@
       if (typeof c.elapsed === 'number') head.append(el('span', 'time', `${(c.elapsed * 1000).toFixed(0)} мс`));
       div.append(head);
       if (c.reason) div.append(el('div', 'reason', c.reason));
+      if (c.action) div.append(el('div', 'label', `дія коду: ${c.action}`));
       div.append(el('div', 'label', 'аргументи від моделі'));
       div.append(el('pre', '', pretty(c.arguments) || '—'));
       if (c.result !== null && c.result !== undefined) {
@@ -170,6 +213,13 @@
   function renderMeta(data) {
     const parts = [];
     if (data.model) parts.push(`модель: ${data.model}`);
+    if (data.mode) parts.push(`режим: ${
+      data.mode === 'mock'
+        ? 'тестовый mock'
+        : data.mode === 'ollama'
+          ? 'локальная Ollama'
+          : 'Gemini API'
+    }`);
     if (data.rounds !== undefined) parts.push(`звертань до моделі: ${data.rounds}`);
     if (data.stopped && data.stopped !== 'answer') parts.push(`зупинено: ${data.stopped}`);
     const e = data.elapsed || {};
@@ -194,20 +244,25 @@
     if (!question) return;
     send.disabled = true;
     answerBox.className = 'empty';
-    answerBox.textContent = 'Питаю модель…';
+    answerBox.textContent = modeSelect.value === 'mock'
+      ? 'Тестовый mock…'
+      : modeSelect.value === 'ollama'
+        ? 'Локальная модель отвечает…'
+        : 'Питаю Gemini API…';
     callsBox.className = 'empty';
     callsBox.textContent = '…';
     try {
       const response = await fetch('/api/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customer_id: customerSelect.value, question }),
+        body: JSON.stringify({ question, mode: modeSelect.value }),
       });
       let data;
       try { data = await response.json(); } catch { data = {}; }
       if (!response.ok) {
         showError(data.detail || `Помилка ${response.status}`);
-        callsBox.textContent = '';
+        renderCalls(data.calls);
+        renderMeta(data);
         return;
       }
       answerBox.className = '';
@@ -218,6 +273,18 @@
       showError('Не вдалося звʼязатися із застосунком.');
     } finally {
       send.disabled = false;
+    }
+  });
+
+  customerSelect.addEventListener('change', async () => {
+    customerSelect.disabled = true;
+    try {
+      await setCustomerSession(customerSelect.value);
+      meta.textContent = 'Демонстраційну сесію клієнта оновлено.';
+    } catch (error) {
+      showError(error.message || 'Не вдалося змінити клієнта сесії.');
+    } finally {
+      customerSelect.disabled = false;
     }
   });
 
