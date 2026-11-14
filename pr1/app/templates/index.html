@@ -25,9 +25,7 @@
             max-width: 400px;
         }
         h2 { margin-top: 0; color: #2c3e50; text-align: center; font-weight: 600; }
-        
         .input-group { display: flex; gap: 10px; margin-bottom: 20px; position: relative; }
-        
         input[type="text"] {
             flex-grow: 1;
             padding: 12px 15px;
@@ -38,7 +36,6 @@
             transition: border-color 0.3s;
         }
         input[type="text"]:focus { border-color: #007bff; }
-        
         button {
             background-color: #007bff;
             color: white;
@@ -52,12 +49,11 @@
         }
         button:hover { background-color: #0056b3; }
         button:active { transform: scale(0.95); }
-        
         .suggestions-list {
             position: absolute;
             top: 100%;
             left: 0;
-            width: calc(100% - 100px);
+            width: calc(100% - 110px);
             background: white;
             border: 1px solid #ddd;
             border-radius: 8px;
@@ -71,8 +67,6 @@
         .suggestion-item { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #eee; }
         .suggestion-item:last-child { border-bottom: none; }
         .suggestion-item:hover { background-color: #f1f5f9; }
-        
-        /* === Стилі для порожньої сторінки === */
         .welcome-box {
             text-align: center;
             padding: 20px 0;
@@ -81,7 +75,6 @@
         }
         .welcome-icon { font-size: 64px; margin-bottom: 10px; }
         .welcome-box h3 { color: #1e293b; margin: 0 0 10px 0; }
-        
         .popular-cities { margin-top: 25px; }
         .popular-cities p { font-size: 13px; color: #64748b; margin-bottom: 12px; text-transform: uppercase; font-weight: bold; }
         .chips-container { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
@@ -96,13 +89,10 @@
             transition: all 0.2s;
         }
         .city-chip:hover { background: #007bff; color: white; border-color: #007bff; }
-
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-
-        /* Віджет погоди */
         .weather-card {
             background: linear-gradient(to bottom right, #ffffff, #f1f5f9);
             padding: 25px;
@@ -115,12 +105,10 @@
         .weather-city { font-size: 24px; font-weight: bold; margin: 0 0 5px 0; color: #1e293b; }
         .weather-icon { font-size: 72px; line-height: 1; margin: 15px 0; }
         .weather-desc { font-size: 18px; font-weight: 500; color: #475569; margin-bottom: 20px; text-transform: capitalize; }
-        
         .weather-details { display: flex; justify-content: space-around; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .detail-item { display: flex; flex-direction: column; align-items: center; }
         .detail-value { font-size: 20px; font-weight: bold; color: #0f172a; }
         .detail-label { font-size: 12px; color: #64748b; margin-top: 5px; text-transform: uppercase; }
-
         .daily-forecast { margin-top: 25px; animation: fadeIn 0.6s ease-out; }
         .daily-forecast h4 { margin: 0 0 10px 0; color: #475569; font-size: 14px; text-transform: uppercase; text-align: left; }
         .daily-grid { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; }
@@ -132,32 +120,27 @@
         .daily-temps { font-size: 14px; display: flex; justify-content: center; gap: 6px; }
         .temp-max { font-weight: bold; color: #0f172a; }
         .temp-min { color: #94a3b8; }
-
         .error-box { background: #fef2f2; color: #991b1b; padding: 15px; border-radius: 8px; margin-top: 15px; border: 1px solid #f87171; text-align: center; animation: fadeIn 0.3s; }
         .back-link { display: inline-block; width: 100%; text-align: center; margin-top: 20px; color: #64748b; text-decoration: none; font-size: 14px; }
         .back-link:hover { color: #0f172a; text-decoration: underline; }
     </style>
 </head>
 <body>
-
     <div class="container">
         <h2>🌤️ Дізнатися погоду</h2>
-        
         <form action="/weather" method="get" id="weather-form">
             <div class="input-group">
-                <input type="text" id="city-input" name="city" autocomplete="off" placeholder="Введіть місто..." required value="{{ city if city else '' }}">
+                <input type="text" id="city-input" name="city" autocomplete="off" placeholder="Введіть місто..." value="{{ city if city else '' }}">
                 <button type="submit">Шукати</button>
                 <div id="suggestions" class="suggestions-list"></div>
             </div>
         </form>
 
-        <!-- Початковий екран (якщо немає ні погоди, ні помилки) -->
         {% if not weather and not error %}
             <div class="welcome-box">
                 <div class="welcome-icon">🌍</div>
                 <h3>Вітаємо!</h3>
                 <p>Введіть назву міста, щоб дізнатися точний прогноз погоди на найближчі 7 днів.</p>
-                
                 <div class="popular-cities">
                     <p>Або оберіть популярне місто:</p>
                     <div class="chips-container">
@@ -176,7 +159,6 @@
                 <h3 class="weather-city">{{ city }}</h3>
                 <div class="weather-icon">{{ weather.icon }}</div>
                 <div class="weather-desc">{{ weather.description }}</div>
-                
                 <div class="weather-details">
                     <div class="detail-item">
                         <span class="detail-value">{{ weather.temperature }}°C</span>
@@ -188,7 +170,7 @@
                     </div>
                 </div>
             </div>
-            
+
             {% if weather.daily %}
             <div class="daily-forecast">
                 <h4>Прогноз на 7 днів</h4>
@@ -224,7 +206,6 @@
         const weatherForm = document.getElementById('weather-form');
         let debounceTimer;
 
-        // Функція для швидких кнопок міст
         function searchCity(cityName) {
             cityInput.value = cityName;
             weatherForm.submit();
@@ -261,7 +242,7 @@
                         }
                     }
                 } catch (err) { console.error(err); }
-            }, 300); 
+            }, 300);
         });
 
         document.addEventListener('click', function(e) {
