@@ -222,6 +222,15 @@
             border-radius: 10px;
         }
         .meta-info span span { color: var(--text-main); font-weight: 600; }
+        .error-box {
+            display: none;
+            margin-top: 20px;
+            padding: 14px 18px;
+            border-radius: 10px;
+            background: var(--danger-bg);
+            color: var(--danger-text);
+            white-space: pre-wrap;
+        }
     </style>
 </head>
 <body>
@@ -234,6 +243,7 @@
         </div>
 
         <div class="loading" id="loadingIndicator">✨ Штучний інтелект аналізує базу знань та формує відповідь...</div>
+        <div class="error-box" id="errorBox" role="alert"></div>
 
         <div class="result-card" id="resultCard" style="display: none;">
             <div id="statusBadge"></div>
@@ -252,33 +262,52 @@
     </div>
 
     <script>
+        function appendTextElement(parent, tag, className, text) {
+            const element = document.createElement(tag);
+            if (className) element.className = className;
+            element.textContent = text;
+            parent.append(element);
+            return element;
+        }
+
+        function renderList(container, items, renderItem, emptyMessage) {
+            container.replaceChildren();
+            if (!items.length) {
+                appendTextElement(container, "span", "", emptyMessage);
+                return;
+            }
+            for (const item of items) renderItem(container, item);
+        }
+
         async function askAssistant() {
             const query = document.getElementById('queryInput').value.trim();
             const loading = document.getElementById('loadingIndicator');
             const card = document.getElementById('resultCard');
+            const errorBox = document.getElementById('errorBox');
             
             if (!query) return;
 
+            errorBox.style.display = 'none';
+            errorBox.textContent = '';
             loading.style.display = 'block';
             card.style.display = 'none';
 
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 45000);
             try {
-                const response = await fetch(`/ask?q=${encodeURIComponent(query)}`);
+                const response = await fetch(`/ask?q=${encodeURIComponent(query)}`, {
+                    signal: controller.signal
+                });
                 const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Не вдалося отримати відповідь.');
+                }
                 
                 loading.style.display = 'none';
                 card.style.display = 'block';
 
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-
-                const res = data.result;
-
-                // Бейдж
                 const badge = document.getElementById('statusBadge');
-                if (res.found_in_base) {
+                if (data.found_in_base) {
                     badge.className = 'badge badge-success';
                     badge.textContent = '✓ Знайдено за базою знань';
                 } else {
@@ -286,43 +315,70 @@
                     badge.textContent = '✕ У базі знань немає інформації';
                 }
 
-                // Текст
-                document.getElementById('answerText').textContent = res.response_text;
+                document.getElementById('answerText').textContent = data.response_text;
 
-                // Источники
                 const sourcesList = document.getElementById('sourcesList');
-                sourcesList.innerHTML = res.sources.length ? '' : '<span style="color:var(--text-muted); font-size:14px;">Модель не спиралася на джерела.</span>';
-                res.sources.forEach(src => {
-                    sourcesList.innerHTML += `
-                        <div class="source-item">
-                            <b>[${src.source_id}] ${src.document_name}</b> — Розділ: <i>${src.section}</i> (Редакція: ${src.updated})
-                        </div>
-                    `;
-                });
+                renderList(sourcesList, data.sources, (parent, source) => {
+                    const item = appendTextElement(
+                        parent,
+                        'div',
+                        'source-item',
+                        `[${source.source_id}] ${source.document_name} — ${source.source}`
+                    );
+                    appendTextElement(
+                        item,
+                        'div',
+                        '',
+                        `Розділ: ${source.section} | Редакція: ${source.updated}`
+                    );
+                }, 'Використаних джерел немає.');
 
-                // Чанки
                 const chunksList = document.getElementById('chunksList');
-                chunksList.innerHTML = res.raw_chunks.length ? '' : 'Фрагменти відсутні.';
-                res.raw_chunks.forEach(chunk => {
-                    chunksList.innerHTML += `
-                        <div class="chunk-item">
-                            <b>[${chunk.source_id}] ${chunk.document_name}</b> &mdash; <i>${chunk.section}</i><br>
-                            <div style="color: #475569; margin-top: 6px; white-space: pre-wrap; line-height: 1.5;">${chunk.text}</div>
-                        </div>
-                    `;
-                });
+                renderList(chunksList, data.context_chunks, (parent, chunk) => {
+                    const item = document.createElement('div');
+                    item.className = 'chunk-item';
+                    appendTextElement(
+                        item,
+                        'b',
+                        '',
+                        `[${chunk.source_id}] ${chunk.document_name} — ${chunk.source}`
+                    );
+                    appendTextElement(
+                        item,
+                        'div',
+                        '',
+                        `Розділ: ${chunk.section} | Редакція: ${chunk.updated} | Оцінка: ${chunk.score ?? '—'}`
+                    );
+                    appendTextElement(item, 'div', '', chunk.text);
+                    parent.append(item);
+                }, 'Фрагменти не передавалися моделі.');
 
-                // Метаинформация с иконками
-                document.getElementById('metaInfo').innerHTML = `
-                    <span>🤖 Модель: <span>${res.model}</span></span>
-                    <span>⚡ Пошук: <span>${data.search_time_ms} мс</span></span>
-                    <span>⏱️ Генерація: <span>${res.generation_time_seconds} с</span></span>
-                    <span>🔢 Токени: <span>${res.tokens.total_tokens}</span></span>
-                `;
-
+                const metaInfo = document.getElementById('metaInfo');
+                metaInfo.replaceChildren();
+                const tokenCounts = data.tokens || {};
+                const metadata = [
+                    ['Статус', data.status],
+                    ['Модель', data.model],
+                    ['Пошук', `${data.search_time_ms} мс`],
+                    ['Генерація', `${data.generation_time_ms} мс`],
+                    ['Токени запиту', tokenCounts.prompt_tokens ?? 0],
+                    ['Токени відповіді', tokenCounts.completion_tokens ?? 0],
+                    ['Усього токенів', tokenCounts.total_tokens ?? 0]
+                ];
+                for (const [label, value] of metadata) {
+                    const item = document.createElement('span');
+                    item.append(document.createTextNode(`${label}: `));
+                    appendTextElement(item, 'span', '', String(value ?? '—'));
+                    metaInfo.append(item);
+                }
             } catch (err) {
+                errorBox.textContent = err.name === 'AbortError'
+                    ? 'Час очікування вичерпано. Спробуйте ще раз.'
+                    : (err.message || 'Помилка звернення до сервера.');
+                errorBox.style.display = 'block';
+            } finally {
+                clearTimeout(timeout);
                 loading.style.display = 'none';
-                alert('Помилка звернення до сервера.');
             }
         }
     </script>

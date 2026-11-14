@@ -34,10 +34,7 @@ def load_index() -> Tuple[np.ndarray, List[Dict[str, Any]]]:
     return embeddings, data["chunks"]
 
 def search_vector(query: str, top_k: int = 5, threshold: float = 0.0, filters: dict = None) -> List[Dict[str, Any]]:
-    try:
-        embeddings, chunks = load_index()
-    except FileNotFoundError:
-        return []
+    embeddings, chunks = load_index()
 
     query_vec = np.array(embed_texts([query], is_query=True)[0], dtype=np.float32)
     
@@ -68,6 +65,8 @@ def search_vector(query: str, top_k: int = 5, threshold: float = 0.0, filters: d
         results.append({
             "score": round(score, 4),
             "text": chunk["text"],
+            "raw_text": chunk.get("raw_text", chunk["text"]),
+            "section": chunk.get("section"),
             "source": chunk["source"],
             "metadata": chunk["metadata"]
         })
