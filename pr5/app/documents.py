@@ -1,79 +1,121 @@
-import os
 import re
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
 
-def parse_md_file(file_path: Path) -> Dict[str, Any]:
-    """Читає файл, розбирає метадані з блоку на початку та текст."""
-    with open(file_path, "r", encoding="utf-8") as f:
-        content = f.read()
+import yaml
 
-    metadata = {}
-    body = content
 
-    # Розбір метаданих у форматі YAML-like frontmatter або заголовків
-    if content.startswith("---"):
-        parts = content.split("---", 2)
-        if len(parts) >= 3:
-            meta_raw = parts[1]
-            body = parts[2]
-            for line in meta_raw.strip().split("\n"):
-                if ":" in line:
-                    key, val = line.split(":", 1)
-                    metadata[key.strip()] = val.strip()
+_FRONTMATTER_RE = re.compile(
+    r"\A---[ \t]*\r?\n(.*?)(?:\r?\n)(?:---|\.\.\.)[ \t]*(?:\r?\n|\Z)",
+    re.DOTALL,
+)
+_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
+
+
+def parse_md_file(file_path: Path) -> dict[str, Any]:
+    """Read Markdown content and YAML frontmatter from a knowledge-base file."""
+    content = file_path.read_text(encoding="utf-8")
+    match = _FRONTMATTER_RE.match(content)
+    if match is None:
+        return {"filename": file_path.name, "metadata": {}, "content": content.strip()}
+
+    try:
+        metadata = yaml.load(match.group(1), Loader=yaml.BaseLoader) or {}
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Invalid YAML frontmatter in {file_path}: {exc}") from exc
+    if not isinstance(metadata, dict):
+        raise ValueError(f"YAML frontmatter in {file_path} must be a mapping")
 
     return {
         "filename": file_path.name,
         "metadata": metadata,
-        "content": body.strip()
+        "content": content[match.end():].strip(),
     }
 
-def chunk_text(doc: Dict[str, Any], chunk_size: int = 400, overlap: int = 50) -> List[Dict[str, Any]]:
-    """Ділить текст документа на осмислені фрагменти з урахуванням метаданих."""
-    text = doc["content"]
-    filename = doc["filename"]
-    meta = doc["metadata"]
-    
-    # Розбиваємо за заголовками або абзацами
-    paragraphs = text.split("\n\n")
+
+def _split_long_section(text: str, chunk_size: int, overlap: int) -> list[str]:
     chunks = []
-    current_chunk = ""
-    
-    for p in paragraphs:
-        if len(current_chunk) + len(p) < chunk_size:
-            current_chunk += "\n\n" + p if current_chunk else p
+    start = 0
+
+    while start < len(text):
+        end = min(start + chunk_size, len(text))
+        if end < len(text):
+            boundary = text.rfind(" ", start + chunk_size // 2, end)
+            if boundary > start:
+                end = boundary
+
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+        if end >= len(text):
+            break
+
+        next_start = max(start + 1, end - overlap)
+        while next_start < end and text[next_start].isspace():
+            next_start += 1
+        start = next_start
+
+    return chunks
+
+
+def chunk_text(
+    doc: dict[str, Any], chunk_size: int = 400, overlap: int = 50
+) -> list[dict[str, Any]]:
+    """Split document sections into overlapping, context-enriched chunks."""
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be greater than zero")
+    if overlap < 0 or overlap >= chunk_size:
+        raise ValueError("overlap must be between zero and chunk_size - 1")
+
+    filename = doc["filename"]
+    metadata = doc.get("metadata") or {}
+    title = metadata.get("title") or Path(filename).stem
+    sections: list[tuple[str, list[str]]] = []
+    current_section = "Загальний розділ"
+    current_lines: list[str] = []
+
+    for line in doc.get("content", "").splitlines():
+        heading = _HEADING_RE.match(line)
+        if heading:
+            if current_lines:
+                sections.append((current_section, current_lines))
+            current_section = heading.group(2).strip()
+            current_lines = [line]
         else:
-            if current_chunk:
-                chunks.append(current_chunk.strip())
-            current_chunk = p
-    if current_chunk:
-        chunks.append(current_chunk.strip())
+            current_lines.append(line)
+    if current_lines:
+        sections.append((current_section, current_lines))
 
-    result_chunks = []
-    for i, chunk in enumerate(chunks):
-        # Додаємо назву документа та заголовок до тексту фрагмента для кращого контексту
-        enriched_text = f"Документ: {filename} | Розділ/Частина {i+1}\n{chunk}"
-        result_chunks.append({
-            "id": f"{filename}_chunk_{i}",
-            "text": enriched_text,
-            "raw_text": chunk,
-            "source": filename,
-            "metadata": meta
-        })
-        
-    return result_chunks
-
-def load_all_documents(docs_dir: str) -> List[Dict[str, Any]]:
-    docs_path = Path(docs_dir)
-    all_chunks = []
-    if not docs_path.exists():
-        return all_chunks
-        
-    for file_path in docs_path.glob("*.md"):
-        if file_path.name.startswith("README"):
+    chunks = []
+    chunk_number = 0
+    for section, lines in sections:
+        section_text = "\n".join(lines).strip()
+        if not section_text:
             continue
-        doc = parse_md_file(file_path)
-        chunks = chunk_text(doc)
-        all_chunks.extend(chunks)
-        
+        for raw_text in _split_long_section(section_text, chunk_size, overlap):
+            chunks.append(
+                {
+                    "id": f"{filename}_chunk_{chunk_number}",
+                    "text": f"Документ: {title} | Розділ: {section}\n{raw_text}",
+                    "raw_text": raw_text,
+                    "source": filename,
+                    "section": section,
+                    "metadata": metadata,
+                }
+            )
+            chunk_number += 1
+
+    return chunks
+
+
+def load_all_documents(docs_dir: str | Path) -> list[dict[str, Any]]:
+    docs_path = Path(docs_dir)
+    if not docs_path.is_dir():
+        return []
+
+    all_chunks = []
+    for file_path in sorted(docs_path.rglob("*.md")):
+        if file_path.name.casefold() == "readme.md":
+            continue
+        all_chunks.extend(chunk_text(parse_md_file(file_path)))
     return all_chunks

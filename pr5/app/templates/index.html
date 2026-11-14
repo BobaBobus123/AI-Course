@@ -1,99 +1,161 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-    <meta charset="UTF-8">
-    <title>ПР5: Семантичний пошук по базі знань</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ПР5 — пошук по базі знань</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        h1 { color: #333; font-size: 22px; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
-        .search-box { display: flex; gap: 10px; margin-bottom: 15px; }
-        input[type="text"] { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background: #0056b3; }
-        .filters { display: flex; gap: 15px; margin-bottom: 20px; font-size: 13px; }
-        .results-container { display: flex; gap: 20px; }
-        .column { flex: 1; background: #fafafa; border: 1px solid #ddd; border-radius: 5px; padding: 15px; }
-        .column h3 { margin-top: 0; color: #0056b3; font-size: 16px; border-bottom: 1px solid #ddd; padding-bottom: 8px; }
-        .card { background: white; border: 1px solid #e1e1e1; padding: 10px; border-radius: 4px; margin-bottom: 10px; font-size: 13px; }
-        .score { font-weight: bold; color: #28a745; }
-        .meta { color: #666; font-size: 11px; margin-top: 5px; }
+        :root { color-scheme: light; font-family: Arial, sans-serif; color: #233044; background: #f3f6fa; }
+        body { margin: 0; padding: 24px; }
+        .container { max-width: 1280px; margin: auto; padding: 24px; background: #fff; border-radius: 12px; box-shadow: 0 4px 18px #172b4d18; }
+        h1 { margin-top: 0; font-size: 24px; }
+        .search-box { display: flex; gap: 10px; margin-bottom: 14px; }
+        input, button { border: 1px solid #cbd4e1; border-radius: 6px; padding: 10px; font: inherit; }
+        #queryInput { flex: 1; min-width: 0; }
+        button { border-color: #1769aa; background: #1769aa; color: #fff; cursor: pointer; }
+        button:hover { background: #105687; }
+        .filters { display: flex; flex-wrap: wrap; gap: 12px 18px; margin: 16px 0 22px; }
+        .filters label { display: flex; align-items: center; gap: 7px; color: #526174; font-size: 14px; }
+        .filters input { width: 145px; padding: 7px; }
+        #thresholdInput { width: 75px; }
+        #message { margin: 12px 0; color: #a33b2d; }
+        .results-container { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+        .column { min-width: 0; padding: 16px; background: #f8fafc; border: 1px solid #dfe5ed; border-radius: 8px; }
+        .column h2 { margin: 0 0 14px; color: #155d91; font-size: 17px; }
+        .card { margin: 0 0 12px; padding: 13px; overflow-wrap: anywhere; background: #fff; border: 1px solid #e1e6ed; border-radius: 7px; font-size: 14px; }
+        .card:last-child { margin-bottom: 0; }
+        .score { color: #197245; font-weight: bold; }
+        .source { margin-left: 8px; color: #34445a; }
+        .text { margin-top: 9px; white-space: pre-wrap; line-height: 1.45; }
+        .meta { margin-top: 9px; color: #657387; font-size: 12px; }
+        .empty { color: #657387; font-size: 14px; }
+        .mode { margin: -8px 0 16px; color: #8a5a00; font-size: 13px; }
+        @media (max-width: 760px) {
+            body { padding: 12px; }
+            .container { padding: 16px; }
+            .results-container { grid-template-columns: 1fr; }
+            .search-box { flex-wrap: wrap; }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Семантичний пошук проти пошуку за ключовими словами (ПР5)</h1>
-        
-        <div class="search-box">
-            <input type="text" id="queryInput" placeholder="Введіть пошуковий запит (наприклад: 'Як повернути товар?' або 'код помилки E-01')..." onkeydown="if(event.key==='Enter') performSearch()">
-            <button onclick="performSearch()">Шукати</button>
-        </div>
+    <main class="container">
+        <h1>Пошук по базі знань магазину «Сузір'я»</h1>
+        {% if embedding_backend == "mock" %}
+        <p class="mode">Тестовий mock-режим: результати не є оцінкою якості мовної моделі.</p>
+        {% endif %}
+        <form id="searchForm" class="search-box">
+            <input id="queryInput" type="search" placeholder="Наприклад: як повернути товар?" required>
+            <button type="submit">Шукати</button>
+        </form>
 
         <div class="filters">
-            <label>Аудиторія: <input type="text" id="filterAudience" placeholder="клієнт / оператор" style="padding:4px;"></label>
-            <label>Статус: <input type="text" id="filterStatus" placeholder="чинна / архівна" style="padding:4px;"></label>
-            <label>Поріг схожості: <input type="number" id="thresholdInput" value="0.5" step="0.05" style="width:60px; padding:4px;"></label>
+            <label>Категорія <input id="filterCategory" type="text" placeholder="правила / faq"></label>
+            <label>Аудиторія <input id="filterAudience" type="text" placeholder="клієнти / персонал"></label>
+            <label>Статус <input id="filterStatus" type="text" placeholder="чинний / архів"></label>
+            <label>Поріг схожості <input id="thresholdInput" type="number" value="{{ default_threshold }}" min="-1" max="1" step="0.05"></label>
         </div>
+        <div id="message" role="status" aria-live="polite"></div>
 
         <div class="results-container">
-            <div class="column">
-                <h3 id="vectorHeader">Семантичний пошук (Embeddings)</h3>
-                <div id="vectorResults">Результатів немає.</div>
-            </div>
-            <div class="column">
-                <h3 id="keywordHeader">Пошук за ключовими словами (BM25)</h3>
-                <div id="keywordResults">Результатів немає.</div>
-            </div>
+            <section class="column">
+                <h2 id="vectorHeader">Семантичний пошук</h2>
+                <div id="vectorResults" class="empty">Введіть запит, щоб побачити результати.</div>
+            </section>
+            <section class="column">
+                <h2 id="keywordHeader">Пошук за ключовими словами (BM25)</h2>
+                <div id="keywordResults" class="empty">Введіть запит, щоб побачити результати.</div>
+            </section>
         </div>
-    </div>
+    </main>
 
     <script>
+        const form = document.getElementById("searchForm");
+        form.addEventListener("submit", (event) => {
+            event.preventDefault();
+            performSearch();
+        });
+
+        function renderResults(container, results, scoreLabel) {
+            container.replaceChildren();
+            if (!results.length) {
+                container.className = "empty";
+                container.textContent = "Нічого не знайдено.";
+                return;
+            }
+
+            container.className = "";
+            for (const result of results) {
+                const card = document.createElement("article");
+                card.className = "card";
+
+                const heading = document.createElement("div");
+                const score = document.createElement("span");
+                score.className = "score";
+                score.textContent = `${scoreLabel}: ${result.score}`;
+                const source = document.createElement("span");
+                source.className = "source";
+                source.textContent = `Джерело: ${result.source}`;
+                heading.append(score, source);
+
+                const text = document.createElement("div");
+                text.className = "text";
+                text.textContent = result.text;
+
+                const metadata = document.createElement("div");
+                metadata.className = "meta";
+                metadata.textContent = `Метадані: ${JSON.stringify(result.metadata)}`;
+                card.append(heading, text, metadata);
+                container.append(card);
+            }
+        }
+
         async function performSearch() {
-            const query = document.getElementById('queryInput').value.trim();
-            const audience = document.getElementById('filterAudience').value.trim();
-            const status = document.getElementById('filterStatus').value.trim();
-            const threshold = document.getElementById('thresholdInput').value;
-            
+            const query = document.getElementById("queryInput").value.trim();
             if (!query) return;
 
-            let url = `/search?q=${encodeURIComponent(query)}&threshold=${threshold}&top_k=5`;
-            if (audience) url += `&audience=${encodeURIComponent(audience)}`;
-            if (status) url += `&status=${encodeURIComponent(status)}`;
+            const message = document.getElementById("message");
+            message.textContent = "Шукаємо…";
+            const params = new URLSearchParams({
+                q: query,
+                top_k: "5",
+                threshold: document.getElementById("thresholdInput").value
+            });
+            for (const [parameter, elementId] of [
+                ["category", "filterCategory"],
+                ["audience", "filterAudience"],
+                ["status", "filterStatus"]
+            ]) {
+                const value = document.getElementById(elementId).value.trim();
+                if (value) params.set(parameter, value);
+            }
 
             try {
-                const response = await fetch(url);
+                const response = await fetch(`/search?${params}`);
                 const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || "Не вдалося виконати пошук.");
+                }
 
-                // Відображення семантичного пошуку
-                const vecContainer = document.getElementById('vectorResults');
-                document.getElementById('vectorHeader').textContent = `Семантичний пошук (${data.vector_search.time_ms} мс)`;
-                vecContainer.innerHTML = data.vector_search.results.length ? '' : 'Нічого не знайдено.';
-                data.vector_search.results.forEach(res => {
-                    vecContainer.innerHTML += `
-                        <div class="card">
-                            <div><span class="score">Оцінка: ${res.score}</span> | Джерело: <b>${res.source}</b></div>
-                            <div style="margin-top: 5px; white-space: pre-wrap;">${res.text}</div>
-                            <div class="meta">Метадані: ${JSON.stringify(res.metadata)}</div>
-                        </div>
-                    `;
-                });
-
-                // Відображення пошуку за ключовими словами (виправлено мінус)
-                const kwContainer = document.getElementById('keywordResults');
-                document.getElementById('keywordHeader').textContent = `Пошук за ключовими словами (${data.keyword_search.time_ms} мс)`;
-                kwContainer.innerHTML = data.keyword_search.results.length ? '' : 'Нічого не знайдено.';
-                data.keyword_search.results.forEach(res => {
-                    kwContainer.innerHTML += `
-                        <div class="card">
-                            <div><span class="score">BM25: ${res.score}</span> | Джерело: <b>${res.source}</b></div>
-                            <div style="margin-top: 5px; white-space: pre-wrap;">${res.text}</div>
-                            <div class="meta">Метадані: ${JSON.stringify(res.metadata)}</div>
-                        </div>
-                    `;
-                });
-
-            } catch (err) {
-                alert('Помилка виконання пошуку.');
+                document.getElementById("vectorHeader").textContent =
+                    `Семантичний пошук (${data.vector_search.time_ms} мс)`;
+                document.getElementById("keywordHeader").textContent =
+                    `Пошук BM25 (${data.keyword_search.time_ms} мс)`;
+                renderResults(
+                    document.getElementById("vectorResults"),
+                    data.vector_search.results,
+                    "Схожість"
+                );
+                renderResults(
+                    document.getElementById("keywordResults"),
+                    data.keyword_search.results,
+                    "BM25"
+                );
+                message.textContent = "";
+            } catch (error) {
+                message.textContent = error.message || "Помилка виконання пошуку.";
+                renderResults(document.getElementById("vectorResults"), [], "Схожість");
+                renderResults(document.getElementById("keywordResults"), [], "BM25");
             }
         }
     </script>

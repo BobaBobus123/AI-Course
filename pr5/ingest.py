@@ -1,11 +1,12 @@
 from pathlib import Path
 from app.documents import load_all_documents
-from app.embeddings import embed_texts
+from app.embeddings import EMBEDDING_BACKEND, embed_texts
 from app.index import save_index
 
 def main():
     docs_dir = Path(__file__).resolve().parent / "docs"
     print(f"[*] Читання документів із папки: {docs_dir}")
+    print(f"[*] Режим ембедингів: {EMBEDDING_BACKEND}")
     
     chunks = load_all_documents(str(docs_dir))
     print(f"[*] Загалом сформовано фрагментів: {len(chunks)}")
@@ -18,7 +19,7 @@ def main():
     print("[*] Генерація ембедінгів для фрагментів...")
     embeddings = embed_texts(texts, is_query=False)
     
-    print("[*] З збереження індексу на диск...")
+    print("[*] Збереження індексу на диск...")
     save_index(embeddings, chunks)
     print("[OK] Індекс успішно побудовано та збережено!")
 
