@@ -1,0 +1,7 @@
+[
+  {
+    "file": "rahunok-04-rotate-noise.jpg",
+    "expected_source": "clean/rahunok-04.png",
+    "note": "Синтетичний власний варіант: поворот на 7 градусів і шум."
+  }
+]

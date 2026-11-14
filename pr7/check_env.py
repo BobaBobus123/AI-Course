@@ -11,9 +11,8 @@
 Запустіть перевірку заздалегідь: якщо ключ не працює або обрана модель
 не приймає зображень, зʼясувати це краще до заняття.
 
-Це діагностика перед роботою, а не зразок для наслідування: тут немає
-ані підготовки зображення, ані схеми, ані перевірки відповіді — саме це
-ви проєктуєте самі.
+Це лише коротка перевірка доступності сервісу моделі та середовища; повний
+конвеєр і програмні перевірки запускаються в застосунку.
 """
 
 import base64
@@ -28,8 +27,14 @@ from pathlib import Path
 MIN_PYTHON = (3, 10)
 PACKAGES = ("openai", "dotenv", "fastapi", "uvicorn", "pydantic", "PIL", "multipart")
 OPTIONAL_PACKAGES = ("jsonschema",)
-SETTINGS = ("LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL")
-OPTIONAL_SETTINGS = ("LLM_MAX_TOKENS", "LLM_TIMEOUT", "UPLOAD_MAX_MB", "IMAGE_MAX_SIDE")
+SETTINGS = ("LLM_BASE_URL", "LLM_MODEL_NAME")
+OPTIONAL_SETTINGS = (
+    "LLM_MAX_OUTPUT_TOKENS",
+    "LLM_TIMEOUT_SECONDS",
+    "UPLOAD_MAX_MB",
+    "IMAGE_MAX_SIDE",
+    "IMAGE_MAX_PIXELS",
+)
 HERE = Path(__file__).parent
 SAMPLES = HERE / "samples"
 REFERENCE = HERE / "reference"
@@ -38,7 +43,7 @@ HINTS = {
     "LLM_BASE_URL": "не задано: скопіюйте .env.example у .env",
     "LLM_API_KEY": "не задано: перенесіть ключ із .env попередніх робіт або візьміть "
                    "у Google AI Studio (aistudio.google.com)",
-    "LLM_MODEL": "не задано: назву моделі дивіться в Google AI Studio",
+    "LLM_MODEL_NAME": "не задано: назву моделі дивіться в Google AI Studio",
 }
 
 # Пробне зображення: одне число, намальоване вбудованим шрифтом Pillow.
@@ -95,11 +100,27 @@ def check_settings() -> bool:
         return False
 
     if not Path(".env").exists():
-        report(False, "файл .env", "немає: скопіюйте .env.example у .env і перенесіть ключ")
-    load_dotenv()
+        report(False, "файл .env", "немає: скопіюйте .env.example у .env")
+    load_dotenv(dotenv_path=HERE / ".env")
     ok = True
+    mock_enabled = os.getenv("MOCK_LLM", "true").strip().casefold() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    report(True, "режим mock", "увімкнено; API-ключ не потрібен" if mock_enabled else "вимкнено; буде виклик API")
+    if not mock_enabled and not os.getenv("LLM_API_KEY") and not os.getenv("OPENAI_API_KEY"):
+        report(False, "налаштування LLM_API_KEY", HINTS["LLM_API_KEY"])
+        ok = False
+    elif not mock_enabled:
+        api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
+        report(True, "налаштування LLM_API_KEY", f"задано, довжина {len(api_key)}")
+
     for name in SETTINGS:
         value = os.getenv(name)
+        if name == "LLM_MODEL_NAME":
+            value = value or os.getenv("LLM_MODEL")
         if not value:
             report(False, f"налаштування {name}", HINTS[name])
             ok = False
@@ -107,8 +128,12 @@ def check_settings() -> bool:
             report(True, f"налаштування {name}", f"задано, довжина {len(value)}")
         else:
             report(True, f"налаштування {name}", value)
+    legacy_names = {
+        "LLM_MAX_OUTPUT_TOKENS": "LLM_MAX_TOKENS",
+        "LLM_TIMEOUT_SECONDS": "LLM_TIMEOUT",
+    }
     for name in OPTIONAL_SETTINGS:
-        value = os.getenv(name)
+        value = os.getenv(name) or os.getenv(legacy_names.get(name, ""))
         if value:
             report(True, f"налаштування {name}", value)
         else:
@@ -153,6 +178,19 @@ def probe_image() -> bytes:
 
 def check_call() -> bool:
     """Надіслати пробне зображення й зміряти час."""
+    from dotenv import load_dotenv
+
+    load_dotenv(dotenv_path=HERE / ".env")
+    mock_enabled = os.getenv("MOCK_LLM", "true").strip().casefold() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if mock_enabled:
+        report(True, "пробний запит", "mock увімкнено — зовнішній API не викликається")
+        return True
+
     try:
         from openai import OpenAI
     except ImportError:
@@ -161,7 +199,7 @@ def check_call() -> bool:
 
     base_url = os.getenv("LLM_BASE_URL")
     api_key = os.getenv("LLM_API_KEY")
-    model = os.getenv("LLM_MODEL")
+    model = os.getenv("LLM_MODEL_NAME") or os.getenv("LLM_MODEL")
     if not (base_url and api_key and model):
         report(False, "пробний запит", "перевірку пропущено: налаштування неповні")
         return False

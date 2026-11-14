@@ -1,88 +1,91 @@
-import time
-from fastapi import FastAPI, UploadFile, File
+from pathlib import Path
+from typing import Any
+
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 
-from app.images import prepare_image
-from app.llm import extract_invoice_data
-from app.rules import validate_invoice
+from app.extraction import process
+from app.images import MAX_UPLOAD_BYTES, ImageInputError, ImageTooLargeError
+from app.llm import (
+    LLMConfigurationError,
+    LLMRateLimitError,
+    LLMResponseError,
+    LLMServiceError,
+    LLMTimeoutError,
+    LLMUnavailableError,
+)
+from app.rules import ReferenceDataError
+
 
 app = FastAPI(title="Мультимодальний аналіз рахунків (ПР7)")
+templates_dir = Path(__file__).resolve().parent / "templates"
+templates = Jinja2Templates(directory=str(templates_dir))
 
-templates = Jinja2Templates(directory="app/templates")
 
 @app.get("/", response_class=HTMLResponse)
 async def read_index(request: Request):
-    # Оновлений синтаксис для нових версій FastAPI / Starlette
     return templates.TemplateResponse(request=request, name="index.html")
 
+
 @app.post("/api/process")
-async def process_document(file: UploadFile = File(...)):
-    """Головний конвеєр обробки документа."""
-    start_total = time.time()
-    
-    
-    t0 = time.time()
+async def process_document(file: UploadFile = File(...)) -> dict[str, Any]:
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if not content:
+        raise HTTPException(status_code=400, detail="Завантажений файл порожній.")
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Файл перевищує дозволений розмір "
+                f"{MAX_UPLOAD_BYTES // (1024 * 1024)} МБ."
+            ),
+        )
+
     try:
-        contents = await file.read()
-        data_url, img_meta = prepare_image(contents)
-    except Exception as e:
-        
-        return {"decision": "reject", "reasons": [str(e)], "data": None, "meta": {}}
-    t_prep = time.time() - t0
+        result = await run_in_threadpool(process, content)
+    except ImageTooLargeError as exc:
+        raise HTTPException(status_code=413, detail=str(exc)) from exc
+    except ImageInputError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LLMTimeoutError as exc:
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
+    except (LLMRateLimitError, LLMUnavailableError, LLMConfigurationError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except (LLMResponseError, LLMServiceError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except ReferenceDataError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    
-    t0 = time.time()
-    try:
-        extracted_data, llm_meta = extract_invoice_data(data_url)
-    except Exception as e:
-        # Якщо API моделі впало (ліміти, таймаут) - reject
-        return {"decision": "reject", "reasons": [f"Помилка моделі: {str(e)}"], "data": None, "meta": {}}
-    t_llm = time.time() - t0
-
-    
-    t0 = time.time()
-    issues = validate_invoice(extracted_data)
-    t_rules = time.time() - t0
-    
-    
-    decision = "auto"
-    reasons = []
-    
-    
-    if not extracted_data.doc_type or "рахунок" not in extracted_data.doc_type.lower():
-        decision = "reject"
-        reasons.append("Документ не розпізнано як рахунок на оплату (можливо, це видаткова накладна).")
-    
-    
-    elif issues:
-        decision = "review"
-        reasons.extend([issue["message"] for issue in issues])
-    elif not extracted_data.supplier.iban or not extracted_data.total_to_pay:
-        decision = "review"
-        reasons.append("Відсутні критичні поля (IBAN або підсумкова сума).")
-        
-    
-
-    total_time = time.time() - start_total
-    
-    
-    meta = {
-        "image_size_orig": img_meta["original_size"],
-        "image_size_new": img_meta["new_size"],
-        "time_prep": round(t_prep, 2),
-        "time_llm": round(t_llm, 2),
-        "time_rules": round(t_rules, 3),
-        "time_total": round(total_time, 2),
-        "tokens": llm_meta
-    }
-
+    image = result.image
     return {
-        "decision": decision,
-        "reasons": reasons,
-        "issues": issues,
-        "data": extracted_data.dict(),
-        "meta": meta
+        "decision": result.decision,
+        "reasons": result.reasons,
+        "issues": result.issues,
+        "data": result.document,
+        "meta": {
+            "image_size_orig": image.get("original_size"),
+            "image_size_new": image.get("new_size"),
+            "image_bytes_orig": image.get("original_bytes"),
+            "image_bytes_sent": image.get("sent_bytes"),
+            "time_prep": result.elapsed.get("prepare"),
+            "time_llm": result.elapsed.get("extraction"),
+            "time_rules": result.elapsed.get("checks"),
+            "time_total": round(sum(result.elapsed.values()), 3),
+            "tokens": {
+                key: value
+                for key, value in (result.usage or {}).items()
+                if key.endswith("_tokens")
+            },
+            "model": result.model,
+            "mock": bool(result.usage and result.usage.get("mock")),
+            "mock_sample": (
+                result.usage.get("mock_sample") if result.usage else None
+            ),
+            "mock_warning": (
+                result.usage.get("mock_warning") if result.usage else None
+            ),
+        },
     }

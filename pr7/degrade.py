@@ -74,7 +74,7 @@ def main() -> int:
         img.save(out, "JPEG", quality=args.jpeg or 85)
     else:
         img.save(out)
-    print(f"{out}  {img.width}×{img.height}  {out.stat().st_size // 1024} КБ")
+    print(f"{out}  {img.width}x{img.height}  {out.stat().st_size // 1024} KB")
     return 0
 
 

@@ -1,0 +1,175 @@
+{
+  "model": "gemini-3.8-flash",
+  "mock": false,
+  "sample_count": 28,
+  "records": [
+    {
+      "file": "clean/rahunok-01.png",
+      "variant": "clean",
+      "expected_source": "clean/rahunok-01.png",
+      "error": "LLMUnavailableError: Сервіс мовної моделі тимчасово недоступний."
+    },
+    {
+      "file": "degraded/rahunok-01-blur.jpg",
+      "variant": "blur",
+      "expected_source": "degraded/rahunok-01-blur.jpg",
+      "error": "LLMTimeoutError: Час очікування відповіді моделі (60 с) вичерпано."
+    },
+    {
+      "file": "degraded/rahunok-01-lowres.jpg",
+      "variant": "lowres",
+      "expected_source": "degraded/rahunok-01-lowres.jpg",
+      "error": "LLMUnavailableError: Сервіс мовної моделі тимчасово недоступний."
+    },
+    {
+      "file": "degraded/rahunok-01-jpeg.jpg",
+      "variant": "jpeg",
+      "expected_source": "degraded/rahunok-01-jpeg.jpg",
+      "error": "LLMUnavailableError: Сервіс мовної моделі тимчасово недоступний."
+    },
+    {
+      "file": "degraded/rahunok-01-faded.jpg",
+      "variant": "faded",
+      "expected_source": "degraded/rahunok-01-faded.jpg",
+      "error": "LLMUnavailableError: Сервіс мовної моделі тимчасово недоступний."
+    },
+    {
+      "file": "degraded/rahunok-01-photo.jpg",
+      "variant": "photo",
+      "expected_source": "degraded/rahunok-01-photo.jpg",
+      "error": "LLMUnavailableError: Сервіс мовної моделі тимчасово недоступний."
+    },
+    {
+      "file": "degraded/rahunok-01-crop.jpg",
+      "variant": "crop",
+      "expected_source": "degraded/rahunok-01-crop.jpg",
+      "error": "LLMUnavailableError: Сервіс мовної моделі тимчасово недоступний."
+    },
+    {
+      "file": "clean/rahunok-02.png",
+      "variant": "clean",
+      "expected_source": "clean/rahunok-02.png",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "clean/rahunok-03.png",
+      "variant": "clean",
+      "expected_source": "clean/rahunok-03.png",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "degraded/rahunok-03-blur.jpg",
+      "variant": "blur",
+      "expected_source": "degraded/rahunok-03-blur.jpg",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "degraded/rahunok-03-lowres.jpg",
+      "variant": "lowres",
+      "expected_source": "degraded/rahunok-03-lowres.jpg",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "degraded/rahunok-03-jpeg.jpg",
+      "variant": "jpeg",
+      "expected_source": "degraded/rahunok-03-jpeg.jpg",
+      "error": "LLMTimeoutError: Час очікування відповіді моделі (60 с) вичерпано."
+    },
+    {
+      "file": "degraded/rahunok-03-faded.jpg",
+      "variant": "faded",
+      "expected_source": "degraded/rahunok-03-faded.jpg",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "degraded/rahunok-03-photo.jpg",
+      "variant": "photo",
+      "expected_source": "degraded/rahunok-03-photo.jpg",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "degraded/rahunok-03-crop.jpg",
+      "variant": "crop",
+      "expected_source": "degraded/rahunok-03-crop.jpg",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "clean/rahunok-04.png",
+      "variant": "clean",
+      "expected_source": "clean/rahunok-04.png",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "clean/rahunok-05.png",
+      "variant": "clean",
+      "expected_source": "clean/rahunok-05.png",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "degraded/rahunok-05-blur.jpg",
+      "variant": "blur",
+      "expected_source": "degraded/rahunok-05-blur.jpg",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "degraded/rahunok-05-lowres.jpg",
+      "variant": "lowres",
+      "expected_source": "degraded/rahunok-05-lowres.jpg",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "degraded/rahunok-05-jpeg.jpg",
+      "variant": "jpeg",
+      "expected_source": "degraded/rahunok-05-jpeg.jpg",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "degraded/rahunok-05-faded.jpg",
+      "variant": "faded",
+      "expected_source": "degraded/rahunok-05-faded.jpg",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "degraded/rahunok-05-photo.jpg",
+      "variant": "photo",
+      "expected_source": "degraded/rahunok-05-photo.jpg",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "degraded/rahunok-05-crop.jpg",
+      "variant": "crop",
+      "expected_source": "degraded/rahunok-05-crop.jpg",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "clean/rahunok-06.png",
+      "variant": "clean",
+      "expected_source": "clean/rahunok-06.png",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "clean/rahunok-07.png",
+      "variant": "clean",
+      "expected_source": "clean/rahunok-07.png",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "clean/rahunok-08.png",
+      "variant": "clean",
+      "expected_source": "clean/rahunok-08.png",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "clean/nakladna-09.png",
+      "variant": "clean",
+      "expected_source": "clean/nakladna-09.png",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    },
+    {
+      "file": "own/rahunok-04-rotate-noise.jpg",
+      "variant": "clean",
+      "expected_source": "clean/rahunok-04.png",
+      "error": "LLMRateLimitError: Провайдер перевищив ліміт запитів або квоту. Перевірте ліміт у кабінеті провайдера."
+    }
+  ]
+}

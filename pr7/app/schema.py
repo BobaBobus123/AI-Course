@@ -1,29 +1,52 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class CompanyInfo(BaseModel):
-    name: Optional[str] = Field(None, description="Назва компанії")
-    code: Optional[str] = Field(None, description="Код ЄДРПОУ або РНОКПП (8 або 10 цифр). null, якщо немає.")
-    iban: Optional[str] = Field(None, description="Рахунок IBAN. null, якщо немає.")
+    model_config = ConfigDict(extra="forbid", coerce_numbers_to_str=True)
+
+    name: str | None = Field(
+        default=None,
+        description="Назва сторони точно як у документі; null, якщо відсутня.",
+    )
+    code: str | None = Field(
+        default=None,
+        description="ЄДРПОУ або РНОКПП точно як у документі; null, якщо відсутній.",
+    )
+    iban: str | None = Field(
+        default=None,
+        description="IBAN точно як у документі; null, якщо відсутній.",
+    )
+
 
 class LineItem(BaseModel):
-    name: Optional[str] = Field(None, description="Найменування товару/послуги")
-    unit: Optional[str] = Field(None, description="Одиниця виміру")
-    quantity: Optional[str] = Field(None, description="Кількість (рядок, напр. '2' або '1.5')")
-    price: Optional[str] = Field(None, description="Ціна за одиницю (рядок, напр. '150.00')")
-    sum: Optional[str] = Field(None, description="Сума за позицією (рядок)")
+    model_config = ConfigDict(extra="forbid", coerce_numbers_to_str=True)
+
+    name: str | None = Field(default=None, description="Назва позиції.")
+    unit: str | None = Field(default=None, description="Одиниця виміру.")
+    quantity: str | None = Field(default=None, description="Кількість.")
+    price: str | None = Field(default=None, description="Ціна за одиницю.")
+    sum: str | None = Field(default=None, description="Надрукована сума позиції.")
+
 
 class InvoiceSchema(BaseModel):
-    doc_type: Optional[str] = Field(None, description="Тип документа (наприклад, 'рахунок на оплату', 'видаткова накладна')")
-    number: Optional[str] = Field(None, description="Номер документа. null, якщо немає.")
-    date: Optional[str] = Field(None, description="Дата документа. null, якщо немає.")
-    due_date: Optional[str] = Field(None, description="Строк дії або дата оплати. null, якщо немає.")
-    
-    supplier: CompanyInfo = Field(..., description="Постачальник")
-    buyer: CompanyInfo = Field(..., description="Покупець")
-    
-    items: List[LineItem] = Field(default_factory=list, description="Позиції в документі")
-    
-    total_no_vat: Optional[str] = Field(None, description="Разом без ПДВ (рядок). null, якщо немає.")
-    vat: Optional[str] = Field(None, description="ПДВ (рядок). null, якщо немає.")
-    total_to_pay: Optional[str] = Field(None, description="Всього до сплати (рядок)")
+    model_config = ConfigDict(extra="forbid", coerce_numbers_to_str=True)
+
+    doc_type: str | None = Field(default=None, description="Тип документа.")
+    number: str | None = Field(default=None, description="Номер рахунку.")
+    date: str | None = Field(default=None, description="Дата рахунку.")
+    due_date: str | None = Field(default=None, description="Строк оплати, якщо є.")
+    supplier: CompanyInfo = Field(
+        default_factory=CompanyInfo, description="Постачальник."
+    )
+    buyer: CompanyInfo = Field(default_factory=CompanyInfo, description="Покупець.")
+    items: list[LineItem] = Field(
+        default_factory=list,
+        description="Усі надруковані позиції; нічого не обчислювати самостійно.",
+    )
+    total_no_vat: str | None = Field(
+        default=None, description="Надрукована сума без ПДВ."
+    )
+    vat: str | None = Field(default=None, description="Надрукована сума ПДВ.")
+    total_to_pay: str | None = Field(
+        default=None, description="Надрукована сума до сплати."
+    )

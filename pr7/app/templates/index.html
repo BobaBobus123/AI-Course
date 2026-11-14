@@ -94,6 +94,7 @@
                 </div>
 
                 <div class="meta-grid" id="metaGrid"></div>
+                <div id="mockNotice" style="display: none; margin-top: 16px; padding: 12px; border-radius: 8px; background: #e0f2fe; color: #075985;"></div>
             </div>
         </div>
     </div>
@@ -129,6 +130,9 @@
                     body: formData
                 });
                 const res = await response.json();
+                if (!response.ok) {
+                    throw new Error(res.detail || `Помилка сервера (${response.status}).`);
+                }
 
                 // UI Update
                 document.getElementById('loading').style.display = 'none';
@@ -145,10 +149,14 @@
                 const issuesBox = document.getElementById('issuesBox');
                 const issuesList = document.getElementById('issuesList');
                 issuesList.innerHTML = '';
+                const visibleIssues = res.issues?.length
+                    ? res.issues.map(issue =>
+                        `${issue.field} (${issue.rule}): ${issue.message}`)
+                    : (res.reasons || []);
                 
-                if (res.reasons && res.reasons.length > 0) {
+                if (visibleIssues.length > 0) {
                     issuesBox.style.display = 'block';
-                    res.reasons.forEach(r => {
+                    visibleIssues.forEach(r => {
                         const li = document.createElement('li');
                         li.textContent = r;
                         issuesList.appendChild(li);
@@ -162,8 +170,13 @@
 
                 // Meta Info
                 const m = res.meta;
+                const mockNotice = document.getElementById('mockNotice');
+                mockNotice.style.display = m.mock ? 'block' : 'none';
+                mockNotice.textContent = m.mock ? m.mock_warning : '';
                 if(m.tokens) {
                     document.getElementById('metaGrid').innerHTML = `
+                        <div>Модель: <span>${m.model}</span></div>
+                        <div>Режим: <span>${m.mock ? 'mock (без API)' : 'API'}</span></div>
                         <div>Розмір до: <span>${m.image_size_orig.join('x')} px</span></div>
                         <div>Розмір після: <span>${m.image_size_new.join('x')} px</span></div>
                         <div>Час моделі: <span>${m.time_llm} сек</span></div>
@@ -174,7 +187,7 @@
                 }
 
             } catch (err) {
-                alert("Помилка зв'язку з сервером.");
+                alert(err.message || "Помилка зв'язку з сервером.");
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('processBtn').disabled = false;
             }
