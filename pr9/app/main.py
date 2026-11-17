@@ -1,109 +1,157 @@
-from fastapi import FastAPI, Request, Query
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+
+from dataclasses import asdict
+import logging
 from pathlib import Path
-from typing import Optional
+from typing import Literal
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel, Field
 
 from shop import service
-from . import assistant, workflow, store, tools
 
-app = FastAPI(title="Помічник клієнта — ПР9")
-TEMPLATES_DIR = Path(__file__).parent / "templates"
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+from . import assistant, llm, store, workflow
 
-class AskRequest(BaseModel):
+app = FastAPI(title="Звернення клієнтів — ПР9")
+logger = logging.getLogger(__name__)
+
+INDEX_PAGE = Path(__file__).parent / "templates" / "index.html"
+
+
+class RequestIn(BaseModel):
+    """Нове звернення зі сторінки.
+
+    `customer_id` — клієнт, обраний на сторінці. Тут він заміняє вхід у
+    кабінет: у справжньому застосунку веб-рівень узяв би його із сесії.
+    `mode` — хто обробляє: `workflow` або `agent` (помічник із ПР8).
+    """
+
     customer_id: str
-    question: str = ""
-    text: str = ""
-    mode: str = "workflow"
+    text: str = Field(max_length=2001)
+    mode: Literal["workflow", "agent"] = "workflow"
 
-class OperatorDecisionRequest(BaseModel):
-    action: str = "approve"
-    comment: str = ""
+
+class DecisionIn(BaseModel):
+    """Рішення оператора щодо дії, яка чекає підтвердження."""
+
+    approve: bool
+    comment: str = Field(default="", max_length=500)
+
+
+def run_to_dict(run: workflow.Run) -> dict:
+    """Перетворити стан звернення на те, що піде на сторінку."""
+    data = asdict(run)
+    data["mode"] = "workflow"
+    data["limits"] = workflow.limits()
+    return data
+
+
+def answer_to_dict(result: assistant.Answer) -> dict:
+    """Перетворити результат агента з ПР8 на те, що піде на сторінку.
+
+    Якщо в ПР8 ви змінили склад `Answer` чи `ToolTrace`, перенесіть
+    сюди й свою `answer_to_dict` з `pr8/app/main.py`.
+    """
+    return {
+        "mode": "agent",
+        "answer": result.text,
+        "calls": [asdict(call) for call in result.calls],
+        "rounds": result.rounds,
+        "stopped": result.stopped,
+        "model": result.model,
+        "elapsed": result.elapsed,
+        "usage": result.usage,
+    }
+
 
 @app.get("/", response_class=HTMLResponse)
-def get_index(request: Request):
-    try:
-        raw_runs = store.list_runs() or []
-        safe_runs = [r if isinstance(r, dict) else r.model_dump() for r in raw_runs if r]
-    except Exception:
-        safe_runs = []
+def page() -> str:
+    """Віддати сторінку."""
+    return INDEX_PAGE.read_text(encoding="utf-8")
 
-    try:
-        raw_customers = service.list_customers() or []
-        safe_customers = [c if isinstance(c, dict) else dict(c) for c in raw_customers if c]
-    except Exception:
-        safe_customers = []
 
-    template = templates.env.get_template("index.html")
-    html_content = template.render(
-        request=request,
-        runs=safe_runs,
-        customers=safe_customers,
-        tools_schema=tools.TOOLS_SCHEMA
-    )
-    return HTMLResponse(content=html_content)
+@app.on_event("startup")
+def recover_interrupted_runs() -> None:
+    store.recover_interrupted()
+
 
 @app.get("/api/customers")
-def api_customers():
+def api_customers() -> list[dict]:
+    """Клієнти, від імені яких можна «увійти» на сторінці."""
     return service.list_customers()
 
-@app.get("/api/runs")
-def api_runs(status: Optional[str] = Query(None)):
-    runs = store.list_runs() or []
-    safe_runs = [r if isinstance(r, dict) else r.model_dump() for r in runs if r]
-    
-    if status:
-        filtered = []
-        for r in safe_runs:
-            st = r.get("status")
-            if status in ["awaiting_approval", "waiting_approval"] and st in ["waiting_approval", "awaiting_approval", "stopped"]:
-                filtered.append(r)
-            elif st == status:
-                filtered.append(r)
-        return filtered
-    return safe_runs
-
-@app.get("/api/runs/{run_id}")
-def api_get_run(run_id: str):
-    st = store.load_state(run_id)
-    if not st:
-        return {"error": "Run not found"}
-    return st if isinstance(st, dict) else st.model_dump()
-
-@app.post("/api/runs/{run_id}/decision")
-def api_run_decision(run_id: str, payload: OperatorDecisionRequest):
-    state = workflow.handle_operator_action(run_id, payload.action, payload.comment)
-    return state
-
-@app.post("/api/workflow/{run_id}/operator")
-def api_operator_action(run_id: str, payload: OperatorDecisionRequest):
-    return workflow.handle_operator_action(run_id, payload.action, payload.comment)
-
-def _start_process(payload: AskRequest):
-    query = payload.question or payload.text
-    if payload.mode == "agent":
-        res = assistant.handle_customer_query(payload.customer_id, query)
-        return {
-            "run_id": "agent-mode",
-            "status": "completed",
-            "answer": res.get("answer"),
-            "journal": [{"step": "agent", "type": "model", "status": "ok", "message": "Виконано через агента ПР8", "data": res, "time": ""}]
-        }
-    else:
-        state = workflow.create_run(payload.customer_id, query)
-        return state
-
-@app.post("/api/requests")
-def api_requests(payload: AskRequest):
-    return _start_process(payload)
-
-@app.post("/api/workflow/start")
-def api_workflow_start(payload: AskRequest):
-    return _start_process(payload)
 
 @app.post("/api/reset")
-def api_reset():
+def api_reset() -> dict:
+    """Повернути дані магазину до початкового стану: створені повернення
+    й скасування зникають. Збережені звернення не зачіпаються — їх
+    видаляйте з `RUNS_DIR` самі, якщо потрібно."""
     service.reset()
     return {"ok": True}
+
+
+@app.post("/api/requests")
+def api_create(payload: RequestIn) -> dict:
+    """Прийняти звернення й обробити його обраним способом.
+
+    Workflow повертає стан звернення (див. `run_to_dict`), агент —
+    відповідь і журнал викликів, як у ПР8 (див. `answer_to_dict`).
+
+    Workflow-помилки зберігаються як контрольовані стани звернення;
+    некоректний запит або невідомий клієнт отримують відповідний HTTP-код.
+    """
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Звернення не може бути порожнім.")
+    if len(text) > 2000:
+        raise HTTPException(status_code=400, detail="Звернення занадто довге.")
+    try:
+        service.get_customer(payload.customer_id)
+    except service.NotFound as exc:
+        raise HTTPException(status_code=404, detail="Клієнта не знайдено.") from exc
+    except service.Unavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Сервіс магазину тимчасово недоступний. Спробуйте пізніше.",
+        ) from exc
+
+    if payload.mode == "agent":
+        try:
+            return answer_to_dict(assistant.answer(text, payload.customer_id))
+        except llm.LLMError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    return run_to_dict(workflow.start(text, payload.customer_id))
+
+
+@app.get("/api/runs")
+def api_runs(status: str | None = None) -> list[dict]:
+    """Звернення, оброблені workflow, — усі або з певним статусом.
+
+    Черга оператора на сторінці — це `?status=awaiting_approval`. Якщо
+    ваш статус очікування називається інакше, змініть його в сторінці.
+    """
+    return [run_to_dict(run) for run in store.list_runs(status)]
+
+
+@app.get("/api/runs/{run_id}")
+def api_run(run_id: str) -> dict:
+    """Return one saved run, or 404 when it does not exist."""
+    run = store.load(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Звернення не знайдено.")
+    return run_to_dict(run)
+
+
+@app.post("/api/runs/{run_id}/decision")
+def api_decision(run_id: str, payload: DecisionIn) -> dict:
+    """Рішення оператора: підтвердити чи відхилити дію.
+
+    Повторне рішення не запускає дію вдруге: повертається поточний стан.
+    """
+    try:
+        return run_to_dict(workflow.resume(run_id, payload.approve, payload.comment))
+    except workflow.RunNotFound as exc:
+        raise HTTPException(status_code=404, detail="Звернення не знайдено.") from exc
+    except Exception as exc:
+        logger.exception("Помилка рішення оператора для %s", run_id)
+        raise HTTPException(status_code=500, detail="Не вдалося зберегти рішення оператора.") from exc

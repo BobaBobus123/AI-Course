@@ -1,17 +1,34 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from dataclasses import dataclass, field
 
-class WorkflowState(BaseModel):
+
+@dataclass
+class Step:
+    n: int
+    name: str
+    kind: str
+    status: str
+    detail: str | None = None
+    input: dict | list | str | None = None
+    output: dict | list | str | None = None
+    elapsed: float | None = None
+    usage: dict | None = None
+    at: str | None = None
+
+
+@dataclass
+class Run:
     run_id: str
     customer_id: str
     text: str
-    status: str = "running"  # running, waiting_approval, completed, rejected, stopped
-    current_step: str = "parse"
-    parsed_data: Optional[Dict[str, Any]] = None
-    order_info: Optional[Dict[str, Any]] = None
-    journal: List[Dict[str, Any]] = Field(default_factory=list)
-    tokens_used: int = 0
-    start_time: float = 0.0
-    answer: Optional[str] = None
-    operator_comment: Optional[str] = None
-    created_at: str = ""
+    status: str = "running"
+    route: str | None = None
+    steps: list[Step] = field(default_factory=list)
+    data: dict = field(default_factory=dict)
+    pending: dict | None = None
+    decision: dict | None = None
+    reply: str | None = None
+    stopped: str | None = None
+    usage: dict = field(default_factory=dict)
+    elapsed: dict = field(default_factory=dict)
+    created_at: str | None = None
+    updated_at: str | None = None

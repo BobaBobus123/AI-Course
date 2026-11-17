@@ -1,104 +1,177 @@
 import json
+import os
 import time
+from dataclasses import dataclass, field
+
 from dotenv import load_dotenv
+
 from . import llm, tools
 
 load_dotenv()
-TOOL_MAX_ROUNDS = 5
 
-def _usage_dict(usage: object) -> dict:
-    if usage is None:
-        return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
-    if hasattr(usage, "model_dump"):
-        return usage.model_dump()
-    return {
-        "prompt_tokens": getattr(usage, "prompt_tokens", 0) or 0,
-        "completion_tokens": getattr(usage, "completion_tokens", 0) or 0,
-        "total_tokens": getattr(usage, "total_tokens", 0) or 0,
-    }
+MAX_ROUNDS = int(os.getenv("TOOL_MAX_ROUNDS", "3"))
 
-def handle_customer_query(customer_id: str, query: str) -> dict:
-    if not query.strip():
-        raise ValueError("Питання не може бути порожнім")
 
-    messages = llm.build_messages(query)
-    calls = []
-    usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
-    elapsed = {"model": 0.0, "tools": 0.0}
-    model_name = getattr(llm, "MODEL", "gemini-3.8-flash")
+@dataclass
+class ToolTrace:
+    round: int
+    name: str
+    arguments: str
+    status: str
+    reason: str | None = None
+    result: dict | list | str | None = None
+    elapsed: float | None = None
+
+
+@dataclass
+class Answer:
+    text: str
+    calls: list[ToolTrace] = field(default_factory=list)
+    rounds: int = 0
+    stopped: str = "answer"
+    model: str | None = None
+    elapsed: dict = field(default_factory=dict)
+    usage: dict | None = None
+
+
+_FALLBACK_LIMIT = (
+    "Вибачте, не вдалося зібрати відповідь за обмежену кількість кроків. "
+    "Спробуйте, будь ласка, переформулювати питання або зверніться до "
+    "оператора підтримки."
+)
+
+
+def answer(question: str, customer_id: str) -> Answer:
+    """Відповісти клієнтові, за потреби викликаючи інструменти."""
+    question = (question or "").strip()
+    if not question:
+        return Answer(
+            text="Будь ласка, напишіть питання.",
+            stopped="empty",
+            elapsed={"model": 0.0, "tools": 0.0},
+            usage={"prompt_tokens": 0, "completion_tokens": 0},
+        )
+
+    ctx = tools.Context(customer_id=customer_id)
+    specs = tools.specs()
+    messages = llm.build_messages(question)
+
+    traces: list[ToolTrace] = []
+    total_prompt = 0
+    total_completion = 0
+    model_time = 0.0
+    tools_time = 0.0
     rounds = 0
+    model_name: str | None = None
 
-    while rounds < TOOL_MAX_ROUNDS:
-        rounds += 1
-        response = llm.chat_with_model(messages)
-        elapsed["model"] += response["elapsed"]
-        model_name = response["model"]
-        current_usage = _usage_dict(response["usage"])
-        for key in usage:
-            usage[key] += current_usage.get(key, 0) or 0
-
-        message = response["message"]
-        tool_calls = message.tool_calls or []
-        if not tool_calls:
-            return {
-                "answer": message.content or "Модель не повернула текстову відповідь.",
-                "calls": calls,
-                "rounds": rounds,
-                "stopped": "answer",
-                "model": model_name,
-                "elapsed": elapsed,
-                "usage": usage,
-            }
-
-        messages.append(message.model_dump(exclude_none=True))
-        for tool_call in tool_calls:
-            name = tool_call.function.name
-            raw_arguments = tool_call.function.arguments or "{}"
+    for round_num in range(1, MAX_ROUNDS + 1):
+        rounds = round_num
+        try:
+            resp = llm.chat(messages, tools=specs, tool_choice="auto")
+        except llm.LLMError:
+            # Збій моделі — не результат інструмента. Пробуємо один
+            # раз без інструментів, щоб дати хоч якусь відповідь.
             try:
-                arguments = json.loads(raw_arguments)
-                if not isinstance(arguments, dict):
-                    raise ValueError("Аргументи мають бути JSON-об'єктом")
-                before = time.perf_counter()
-                content = tools.execute_tool(name, arguments, customer_id)
-                tool_elapsed = time.perf_counter() - before
-                parsed = json.loads(content)
-                has_error = isinstance(parsed, dict) and "error" in parsed
-                code = parsed.get("code") if isinstance(parsed, dict) else None
-                status = "rejected" if code in ("invalid_arguments", "unknown_tool") else "error" if has_error else "ok"
-                reason = parsed.get("error") if has_error else None
-            except (json.JSONDecodeError, ValueError) as error:
-                tool_elapsed = 0.0
-                content = json.dumps({"error": f"Некоректний JSON аргументів: {error}", "code": "invalid_arguments"}, ensure_ascii=False)
-                arguments = raw_arguments
-                status = "rejected"
-                reason = "Модель повернула некоректні аргументи"
+                resp = llm.chat(messages, tools=[], tool_choice="none")
+            except llm.LLMError:
+                raise
+        model_time += resp["elapsed"]
+        model_name = resp["model"]
+        total_prompt += resp["usage"]["prompt_tokens"]
+        total_completion += resp["usage"]["completion_tokens"]
 
-            elapsed["tools"] += tool_elapsed
-            calls.append({
-                "round": rounds,
-                "name": name,
-                "arguments": raw_arguments,
-                "status": status,
-                "reason": reason,
-                "result": content,
-                "elapsed": tool_elapsed,
-            })
+        msg = resp["message"]
+        finish = resp["finish_reason"]
+        tool_calls = getattr(msg, "tool_calls", None) or []
+
+        # Текстова відповідь — кінець циклу
+        if not tool_calls:
+            text = (msg.content or "").strip()
+            if not text:
+                text = _FALLBACK_LIMIT
+            return Answer(
+                text=text,
+                calls=traces,
+                rounds=rounds,
+                stopped="answer",
+                model=model_name,
+                elapsed={"model": round(model_time, 3),
+                         "tools": round(tools_time, 3)},
+                usage={"prompt_tokens": total_prompt,
+                       "completion_tokens": total_completion},
+            )
+
+        # Додаємо повідомлення моделі як є
+        messages.append(_message_to_dict(msg))
+
+        # Виконуємо кожен виклик
+        for call in tool_calls:
+            t0 = time.perf_counter()
+            result = tools.call(call.function.name,
+                                call.function.arguments, ctx)
+            elapsed = time.perf_counter() - t0
+            tools_time += elapsed
+
+            traces.append(ToolTrace(
+                round=round_num,
+                name=call.function.name,
+                arguments=call.function.arguments or "",
+                status=result.status,
+                reason=result.reason,
+                result=result.content,
+                elapsed=round(elapsed, 4),
+            ))
+
+            # Результат — теж повідомлення, з tool_call_id
             messages.append({
                 "role": "tool",
-                "tool_call_id": tool_call.id,
-                "name": name,
-                "content": content,
+                "tool_call_id": call.id,
+                "content": json.dumps(result.content, ensure_ascii=False)
+                           if result.content is not None else "",
             })
 
-    return {
-        "answer": "Не вдалося завершити відповідь у межах ліміту викликів моделі. Спробуйте уточнити запит.",
-        "calls": calls,
-        "rounds": rounds,
-        "stopped": "limit",
-        "model": model_name,
-        "elapsed": elapsed,
-        "usage": usage,
-    }
+    # Ліміт вичерпано — останній шанс на відповідь
+    try:
+        final = llm.chat(messages, tools=[], tool_choice="none")
+        model_time += final["elapsed"]
+        total_prompt += final["usage"]["prompt_tokens"]
+        total_completion += final["usage"]["completion_tokens"]
+        text = (final["message"].content or "").strip() or _FALLBACK_LIMIT
+    except llm.LLMError:
+        text = _FALLBACK_LIMIT
 
-def answer(question: str, customer_id: str):
-    return handle_customer_query(customer_id, question)
+    return Answer(
+        text=text,
+        calls=traces,
+        rounds=rounds,
+        stopped="limit",
+        model=model_name,
+        elapsed={"model": round(model_time, 3),
+                 "tools": round(tools_time, 3)},
+        usage={"prompt_tokens": total_prompt,
+               "completion_tokens": total_completion},
+    )
+
+
+def _message_to_dict(msg) -> dict:
+    """Перетворити повідомлення моделі в dict для історії.
+
+    Gemini додає до `tool_calls` службові поля (`extras`,
+    `thought_signature`), без яких наступний запит може не прийнятися.
+    Тому серіалізуємо об'єкт як є.
+    """
+    if hasattr(msg, "model_dump"):
+        return msg.model_dump(exclude_none=True)
+    # Fallback для сумісності зі старішими версіями SDK
+    out = {"role": "assistant", "content": msg.content or ""}
+    if getattr(msg, "tool_calls", None):
+        out["tool_calls"] = [
+            {
+                "id": c.id,
+                "type": "function",
+                "function": {"name": c.function.name,
+                             "arguments": c.function.arguments},
+            }
+            for c in msg.tool_calls
+        ]
+    return out
