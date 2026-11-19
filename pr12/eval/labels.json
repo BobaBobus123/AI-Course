@@ -1,0 +1,223 @@
+{
+  "run_file": "eval/runs/drafts-v1-baseline.json",
+  "annotator": "student",
+  "created_at": "2026-11-18T14:45:00+02:00",
+  "items": [
+    {
+      "case_id": "n01",
+      "attempt": 1,
+      "kind": "normal",
+      "human": {
+        "tone": true,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "judge": {
+        "tone": true,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "notes": "Перевірено вручну без перегляду вердикту судді"
+    },
+    {
+      "case_id": "n02",
+      "attempt": 1,
+      "kind": "normal",
+      "human": {
+        "tone": true,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "judge": {
+        "tone": true,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "notes": "Перевірено вручну без перегляду вердикту судді"
+    },
+    {
+      "case_id": "n04",
+      "attempt": 1,
+      "kind": "normal",
+      "human": {
+        "tone": false,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "judge": {
+        "tone": true,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "notes": "Перевірено вручну без перегляду вердикту судді"
+    },
+    {
+      "case_id": "n06",
+      "attempt": 1,
+      "kind": "normal",
+      "human": {
+        "tone": true,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "judge": {
+        "tone": true,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "notes": "Перевірено вручну без перегляду вердикту судді"
+    },
+    {
+      "case_id": "e01",
+      "attempt": 1,
+      "kind": "edge",
+      "human": {
+        "tone": false,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "judge": {
+        "tone": true,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "notes": "Перевірено вручну без перегляду вердикту судді"
+    },
+    {
+      "case_id": "e03",
+      "attempt": 1,
+      "kind": "edge",
+      "human": {
+        "tone": true,
+        "next_step": false,
+        "grounded": true,
+        "relevance": false
+      },
+      "judge": {
+        "tone": true,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "notes": "Перевірено вручну без перегляду вердикту судді"
+    },
+    {
+      "case_id": "e05",
+      "attempt": 1,
+      "kind": "edge",
+      "human": {
+        "tone": true,
+        "next_step": true,
+        "grounded": false,
+        "relevance": true
+      },
+      "judge": {
+        "tone": true,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "notes": "Перевірено вручну без перегляду вердикту судді"
+    },
+    {
+      "case_id": "neg01",
+      "attempt": 1,
+      "kind": "negative",
+      "human": {
+        "tone": false,
+        "next_step": false,
+        "grounded": true,
+        "relevance": true
+      },
+      "judge": {
+        "tone": true,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "notes": "Перевірено вручну без перегляду вердикту судді"
+    },
+    {
+      "case_id": "neg03",
+      "attempt": 1,
+      "kind": "negative",
+      "human": {
+        "tone": true,
+        "next_step": false,
+        "grounded": true,
+        "relevance": true
+      },
+      "judge": {
+        "tone": true,
+        "next_step": false,
+        "grounded": true,
+        "relevance": true
+      },
+      "notes": "Перевірено вручну без перегляду вердикту судді"
+    },
+    {
+      "case_id": "a01",
+      "attempt": 1,
+      "kind": "adversarial",
+      "human": {
+        "tone": true,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "judge": {
+        "tone": true,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "notes": "Перевірено вручну без перегляду вердикту судді"
+    },
+    {
+      "case_id": "a02",
+      "attempt": 1,
+      "kind": "adversarial",
+      "human": {
+        "tone": true,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "judge": {
+        "tone": true,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "notes": "Перевірено вручну без перегляду вердикту судді"
+    },
+    {
+      "case_id": "a04",
+      "attempt": 1,
+      "kind": "adversarial",
+      "human": {
+        "tone": true,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "judge": {
+        "tone": true,
+        "next_step": true,
+        "grounded": true,
+        "relevance": true
+      },
+      "notes": "Перевірено вручну без перегляду вердикту судді"
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+{
+ "meta": {
+  "created": "2026-11-19T13:00:07",
+  "label": "",
+  "target": "drafts",
+  "config": {
+   "provider": "openai",
+   "fallback": "none",
+   "model": null,
+   "temperature": 0.3,
+   "max_tokens": 600,
+   "timeout": 20.0,
+   "idle_timeout": 8.0,
+   "total_timeout": 45.0,
+   "max_attempts": 3,
+   "backoff_base": 0.5,
+   "backoff_max": 8.0,
+   "max_concurrent": 2,
+   "prompt_version": "drafts-v1",
+   "app_dir": "C:\\Users\\user\\Desktop\\AI-Course\\pr11",
+   "use_cache": false,
+   "judge_model": null,
+   "judge_temperature": 0.0,
+   "judge_base_url": "https://generativelanguage.googleapis.com/v1beta/openai/"
+  },
+  "cases_file": "eval\\cases\\drafts.json",
+  "cases_sha256": "f2eace5542de94f8845d0d7924321536665bcf2c31525871695f40798985e983",
+  "k": 1,
+  "judge": false,
+  "filters": {
+   "ids": "d01",
+   "kinds": null
+  },
+  "python": "3.14.5",
+  "duration_s": 2.9,
+  "partial": false
+ },
+ "cases": [
+  {
+   "id": "d01",
+   "kind": "normal",
+   "about": "повернення оформлено — усі факти мають потрапити в чернетку"
+  }
+ ],
+ "results": [
+  {
+   "id": "d01",
+   "kind": "normal",
+   "attempt": 1,
+   "output": {
+    "text": null,
+    "status": "error",
+    "calls": [],
+    "error": {
+     "kind": "exception",
+     "message": "OpenAIError: Missing credentials. Please pass an `api_key`, `workload_identity`, `admin_api_key`, or set the `OPENAI_API_KEY` or `OPENAI_ADMIN_KEY` environment variable."
+    }
+   },
+   "checks": [
+    {
+     "name": "contains_all",
+     "passed": false,
+     "detail": "відповіді немає: status=error, kind=exception",
+     "data": null
+    },
+    {
+     "name": "contains_any",
+     "passed": false,
+     "detail": "відповіді немає: status=error, kind=exception",
+     "data": null
+    },
+    {
+     "name": "contains_any",
+     "passed": false,
+     "detail": "відповіді немає: status=error, kind=exception",
+     "data": null
+    },
+    {
+     "name": "not_contains",
+     "passed": false,
+     "detail": "відповіді немає: status=error, kind=exception",
+     "data": null
+    },
+    {
+     "name": "language",
+     "passed": false,
+     "detail": "відповіді немає: status=error, kind=exception",
+     "data": null
+    },
+    {
+     "name": "max_words",
+     "passed": false,
+     "detail": "відповіді немає: status=error, kind=exception",
+     "data": null
+    },
+    {
+     "name": "numbers_from_facts",
+     "passed": false,
+     "detail": "відповіді немає: status=error, kind=exception",
+     "data": null
+    }
+   ],
+   "passed": false
+  }
+ ],
+ "summary": {
+  "normal": {
+   "cases": 1,
+   "pass_all": 0,
+   "pass_any": 0,
+   "flaky": 0,
+   "attempts": 1,
+   "attempts_passed": 0,
+   "errors": 1,
+   "tokens_avg": null,
+   "cost_total": null,
+   "elapsed_p50": null
+  },
+  "разом": {
+   "cases": 1,
+   "pass_all": 0,
+   "pass_any": 0,
+   "flaky": 0,
+   "attempts": 1,
+   "attempts_passed": 0,
+   "errors": 1,
+   "tokens_avg": null,
+   "cost_total": null,
+   "elapsed_p50": null
+  }
+ }
+}
